@@ -55,9 +55,9 @@ export function BlochScene({ bv }: Props) {
 
       {/* Axes */}
       {([
-        [[1.25,0,0],[0xff4455]],
-        [[0,1.25,0],[0x10b981]],
-        [[0,0,1.25],[0x3b82f6]],
+        [[1.25,0,0], 0xff4455],
+        [[0,1.25,0], 0x10b981],
+        [[0,0,1.25], 0x3b82f6],
       ] as [[number,number,number],number][]).map(([d, c], i) => (
         <primitive key={i} object={
           new THREE.ArrowHelper(

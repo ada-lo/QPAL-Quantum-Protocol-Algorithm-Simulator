@@ -34,7 +34,7 @@ export function QDDGraphView() {
 
   const layout = useMemo(() => layoutQDD(graph, 296, 70), [graph])
   const ratio  = compressionRatio(graph)
-  const posMap = new Map(layout.nodes.map(n => [n.id, { x: n.x, y: n.y }]))
+  const posMap = new Map(layout.nodes.map(n => [n.id, { x: n.x, y: n.y, isTerminal: n.isTerminal }]))
 
   const isLive = !!(backendGraph && backendGraph.nQubits > 6)
 

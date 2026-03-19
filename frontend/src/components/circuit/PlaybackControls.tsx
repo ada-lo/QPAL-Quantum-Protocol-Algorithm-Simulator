@@ -10,7 +10,6 @@ export function PlaybackControls() {
   const intervalRef = useRef<ReturnType<typeof setInterval>>()
 
   const total = snapshots?.length ?? 0
-  if (total <= 1) return null
 
   // Show snapshot for current scrubber position
   function seekTo(idx: number) {
@@ -30,20 +29,20 @@ export function PlaybackControls() {
   }
 
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setCurrentStep(prev => {
-          const next = prev + 1
-          if (next >= total - 1) { setIsPlaying(false); seekTo(total - 1); return total - 1 }
-          seekTo(next)
-          return next
-        })
-      }, 600)
-    } else {
+    if (!isPlaying || total <= 1) {
       clearInterval(intervalRef.current)
+      return
     }
+    intervalRef.current = setInterval(() => {
+      const prev = useCircuitStore.getState().currentStep
+      const next = prev + 1
+      if (next >= total - 1) { setIsPlaying(false); seekTo(total - 1) }
+      else { seekTo(next) }
+    }, 600)
     return () => clearInterval(intervalRef.current)
   }, [isPlaying, total])
+
+  if (total <= 1) return null
 
   return (
     <div style={{

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react"
 import { useCircuitStore } from "@/store/circuitStore"
 import { useSimStore } from "@/store/simStore"
 import { runCircuit, blochVector, type StepSnapshot } from "@/lib/quantum/simulator"
-import type { ComplexType } from "@/lib/quantum/stateVector"
+import type { Complex } from "@/lib/quantum/stateVector"
 
 // Debounce helper
 function useDebounce(fn: () => void, delay: number) {

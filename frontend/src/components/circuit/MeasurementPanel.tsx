@@ -7,15 +7,17 @@ import { useMemo } from "react"
 export function MeasurementPanel() {
   const result = useSimStore(s => s.result)
   const nQubits = useCircuitStore(s => s.nQubits)
-  if (!result) return null
 
   const bars = useMemo(() => {
+    if (!result) return []
     return result.probabilities
       .map((p, i) => ({ p, label: formatBasisState(i, nQubits), i }))
       .filter(b => b.p > 0.001)
       .sort((a, b) => b.p - a.p)
       .slice(0, 20)
-  }, [result.probabilities, nQubits])
+  }, [result, nQubits])
+
+  if (!result) return null
 
   const maxP = Math.max(...bars.map(b => b.p))
 
