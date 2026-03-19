@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: #050a14;
+    color: #e2f0ff;
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #050a14; }
+  ::-webkit-scrollbar-thumb { background: #1a3a5c; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #00d4ff44; }
+}
+
+@layer components {
+  /* ── Panels ───────────────────────────── */
+  .panel {
+    @apply bg-quantum-panel border border-quantum-border rounded-lg;
+  }
+
+  .panel-surface {
+    @apply bg-quantum-surface border border-quantum-border rounded-lg;
+  }
+
+  /* ── Buttons ──────────────────────────── */
+  .btn-primary {
+    @apply px-4 py-2 rounded-md font-display font-medium text-sm
+           bg-quantum-accent text-quantum-bg
+           hover:bg-opacity-90 active:scale-95
+           transition-all duration-150;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 rounded-md font-display font-medium text-sm
+           text-quantum-muted border border-quantum-border
+           hover:text-quantum-text hover:border-quantum-accent
+           active:scale-95 transition-all duration-150;
+  }
+
+  /* ── Gate chips ───────────────────────── */
+  .gate-chip {
+    @apply flex items-center justify-center w-10 h-10 rounded-md
+           font-mono font-semibold text-sm cursor-grab
+           border transition-all duration-150
+           hover:scale-110 active:scale-95 active:cursor-grabbing;
+  }
+
+  /* ── Qubit wire ───────────────────────── */
+  .qubit-wire {
+    @apply h-[1px] bg-quantum-border;
+  }
+
+  /* ── Stat label ───────────────────────── */
+  .stat-label {
+    @apply text-xs font-mono text-quantum-muted uppercase tracking-widest;
+  }
+
+  .stat-value {
+    @apply text-lg font-display font-semibold text-quantum-text;
+  }
+
+  /* ── Tab nav ──────────────────────────── */
+  .tab-active {
+    @apply text-quantum-accent border-b-2 border-quantum-accent;
+  }
+
+  .tab-inactive {
+    @apply text-quantum-muted hover:text-quantum-text
+           border-b-2 border-transparent hover:border-quantum-border
+           transition-colors duration-150;
+  }
+}
+
+@layer utilities {
+  /* Glow effects */
+  .glow-accent {
+    box-shadow: 0 0 12px #00d4ff44, 0 0 24px #00d4ff22;
+  }
+
+  .glow-violet {
+    box-shadow: 0 0 12px #7c3aed44, 0 0 24px #7c3aed22;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px #00d4ff88;
+  }
+
+  /* Grid pattern background */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Noise severity indicators */
+  .noise-none   { @apply text-noise-none; }
+  .noise-low    { @apply text-noise-low; }
+  .noise-medium { @apply text-noise-medium; }
+  .noise-high   { @apply text-noise-high; }
+}

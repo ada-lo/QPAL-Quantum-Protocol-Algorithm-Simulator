@@ -1,0 +1,47 @@
+:root {
+  --bg-primary: #080c14;
+  --bg-secondary: #0d1421;
+  --bg-panel: #111827;
+  --bg-card: #141e2e;
+  --bg-hover: #1a2540;
+
+  --border: #1e2d45;
+  --border-bright: #2a3f60;
+
+  --text-primary: #e8f0fe;
+  --text-secondary: #8ba3c7;
+  --text-muted: #4a6080;
+
+  --accent-cyan: #00d4ff;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-pink: #ec4899;
+
+  --gate-h: #8b5cf6;
+  --gate-x: #ef4444;
+  --gate-y: #f59e0b;
+  --gate-z: #3b82f6;
+  --gate-cnot: #10b981;
+  --gate-t: #ec4899;
+  --gate-s: #00d4ff;
+  --gate-measure: #6b7280;
+
+  --noise-high: #ef4444;
+  --noise-mid: #f59e0b;
+  --noise-low: #10b981;
+
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-display: 'Space Grotesk', sans-serif;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-glow-cyan: 0 0 20px rgba(0, 212, 255, 0.15);
+  --shadow-glow-purple: 0 0 20px rgba(139, 92, 246, 0.15);
+  --transition: 0.15s ease;
+}
