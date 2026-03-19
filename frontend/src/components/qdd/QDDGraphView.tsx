@@ -2,7 +2,8 @@
 import { useMemo, useState } from "react"
 import { useSimStore } from "@/store/simStore"
 import { useCircuitStore } from "@/store/circuitStore"
-import { layoutQDD, compressionRatio, syntheticQDD, type QDDGraph } from "@/lib/qdd/graph"
+import { compressionRatio, syntheticQDD, type QDDGraph } from "@/lib/qdd/graph"
+import { layoutQDD } from "@/lib/qdd/layout"
 import { QDDNodeViz } from "./QDDNodeViz"
 import { ComplexityMeter } from "./ComplexityMeter"
 
