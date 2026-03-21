@@ -42,10 +42,9 @@ class QDDEngineWrapper:
                 engine_used="qdd",
             )
         except Exception as e:
-            # Fallback to state vector
+            # Fallback to state vector (sync — we're already in a worker thread)
             from core.engines.state_vector import StateVectorEngine
-            import asyncio
-            return asyncio.get_event_loop().run_until_complete(StateVectorEngine().run(req))
+            return StateVectorEngine()._run_sync(req)
 
     async def run_streaming(self, req: SimulateRequest):
         result = await self.run(req)

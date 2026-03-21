@@ -17,5 +17,6 @@ class SimulateRequest(BaseModel):
     return_qdd: bool = False
 
 class NoiseSimRequest(SimulateRequest):
+    model_config = {"protected_namespaces": ()}
     model_id: str
     params: dict = Field(default_factory=dict)

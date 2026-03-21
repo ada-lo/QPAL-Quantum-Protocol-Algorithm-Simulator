@@ -34,23 +34,31 @@ export const simulateNoisy = async (
   return data
 }
 
-// SSE streaming simulation — returns an EventSource
-export const streamSimulation = (circuitId: string, backend: 'statevector' | 'qdd') => {
-  const url = `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/api/simulate/stream?circuit_id=${circuitId}&backend=${backend}`
-  return new EventSource(url)
+// SSE streaming simulation — backend exposes this as POST
+export const streamSimulation = async (req: SimulateRequest) => {
+  const base = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+  const res = await fetch(`${base}/api/simulate/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  return res.body // ReadableStream for SSE consumption
 }
 
 // ── QDD ───────────────────────────────────────────────────────────
+// Backend route is /api/qdd/simulate (not /api/qdd/graph)
 export const getQDDGraph = async (circuit: Circuit): Promise<QDDGraph> => {
-  const { data } = await api.post<QDDGraph>('/api/qdd/graph', { circuit })
+  const { data } = await api.post<QDDGraph>('/api/qdd/simulate', { circuit })
   return data
 }
 
 // ── Noise models ──────────────────────────────────────────────────
-export const listNoiseModels = async (): Promise<NoiseModel[]> => {
-  const { data } = await api.get<NoiseModel[]>('/api/noise/models')
-  return data
-}
+// TODO: Backend does not yet expose a GET /api/noise/models route.
+// Uncomment when the route is added.
+// export const listNoiseModels = async (): Promise<NoiseModel[]> => {
+//   const { data } = await api.get<NoiseModel[]>('/api/noise/models')
+//   return data
+// }
 
 // ── Protocols ─────────────────────────────────────────────────────
 export const runBB84 = async (params: {
@@ -62,12 +70,13 @@ export const runBB84 = async (params: {
   return data
 }
 
+// Backend route is /api/protocols/teleportation (not /teleport)
 export const runTeleportation = async (params: {
   inputState: { alpha: number; beta: number }
   noisy?: boolean
   noiseModel?: NoiseModel
 }): Promise<ProtocolResult> => {
-  const { data } = await api.post<ProtocolResult>('/api/protocols/teleport', params)
+  const { data } = await api.post<ProtocolResult>('/api/protocols/teleportation', params)
   return data
 }
 
@@ -79,19 +88,22 @@ export const runSuperdenseCoding = async (params: {
 }
 
 // ── Algorithms ────────────────────────────────────────────────────
-export const runGrover = async (params: GroverParams): Promise<AlgorithmResult> => {
-  const { data } = await api.post<AlgorithmResult>('/api/algorithms/grover', params)
-  return data
-}
-
-export const runShor = async (params: ShorParams): Promise<AlgorithmResult> => {
-  const { data } = await api.post<AlgorithmResult>('/api/algorithms/shor', params)
-  return data
-}
-
-export const runQAOA = async (params: QAOAParams): Promise<AlgorithmResult> => {
-  const { data } = await api.post<AlgorithmResult>('/api/algorithms/qaoa', params)
-  return data
-}
+// TODO: Backend does not yet have an algorithms router.
+// These stubs are kept for when backend/api/routes/algorithms.py is created.
+//
+// export const runGrover = async (params: GroverParams): Promise<AlgorithmResult> => {
+//   const { data } = await api.post<AlgorithmResult>('/api/algorithms/grover', params)
+//   return data
+// }
+//
+// export const runShor = async (params: ShorParams): Promise<AlgorithmResult> => {
+//   const { data } = await api.post<AlgorithmResult>('/api/algorithms/shor', params)
+//   return data
+// }
+//
+// export const runQAOA = async (params: QAOAParams): Promise<AlgorithmResult> => {
+//   const { data } = await api.post<AlgorithmResult>('/api/algorithms/qaoa', params)
+//   return data
+// }
 
 export default api

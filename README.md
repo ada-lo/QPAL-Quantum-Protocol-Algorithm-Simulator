@@ -95,15 +95,15 @@ docker-compose up --build
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/simulate` | POST | Run circuit simulation (state-vector or QDD) |
-| `/api/simulate/stream` | GET (SSE) | Stream step-by-step gate-by-gate results |
-| `/api/noise/models` | GET | List available noise models |
+| `/api/simulate/stream` | POST (SSE) | Stream step-by-step gate-by-gate results |
 | `/api/noise/simulate` | POST | Run noisy simulation with Qiskit Aer |
 | `/api/protocols/bb84` | POST | Run BB84 protocol with custom params |
-| `/api/protocols/teleport` | POST | Quantum teleportation protocol |
-| `/api/algorithms/grover` | POST | Grover's search algorithm |
-| `/api/algorithms/shor` | POST | Shor's factoring (small N) |
-| `/api/algorithms/qaoa` | POST | QAOA optimization |
-| `/api/qdd/graph` | POST | Get QDD graph structure for a circuit |
+| `/api/protocols/teleportation` | POST | Quantum teleportation protocol |
+| `/api/protocols/superdense` | POST | Superdense coding protocol |
+| `/api/qdd/simulate` | POST | QDD simulation for large circuits |
+| `/api/algorithms/grover` | POST | Grover's search algorithm *(planned)* |
+| `/api/algorithms/shor` | POST | Shor's factoring *(planned)* |
+| `/api/algorithms/qaoa` | POST | QAOA optimization *(planned)* |
 
 ---
 

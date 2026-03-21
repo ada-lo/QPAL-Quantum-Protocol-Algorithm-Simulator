@@ -52,7 +52,7 @@ class StateVectorEngine:
             shots=req.shots,
         )
         result = job.result()
-        sv = result.get_statevector()
+        sv = np.asarray(result.get_statevector())
 
         probs = [float(abs(a)**2) for a in sv]
         state_vector = [ComplexNum(re=float(a.real), im=float(a.imag)) for a in sv]
@@ -61,7 +61,7 @@ class StateVectorEngine:
         fidelity = 1.0
         if noise_model:
             ideal_job = AerSimulator(method="statevector").run(transpile(qc, AerSimulator(method="statevector")))
-            ideal_sv = ideal_job.result().get_statevector()
+            ideal_sv = np.asarray(ideal_job.result().get_statevector())
             fidelity = float(abs(np.dot(np.conj(ideal_sv), sv))**2)
 
         # Single-qubit Bloch vectors
