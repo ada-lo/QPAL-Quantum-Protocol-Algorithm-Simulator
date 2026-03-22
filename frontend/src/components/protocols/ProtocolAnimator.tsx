@@ -3,6 +3,9 @@ import { useState } from "react"
 import { BB84Animator } from "./BB84Animator"
 import { TeleportAnimator } from "./TeleportAnimator"
 import { SuperdenseAnimator } from "./SuperdenseAnimator"
+import { E91Animator } from "./E91Animator"
+import { B92Animator } from "./B92Animator"
+import { QECAnimator } from "./QECAnimator"
 
 interface Protocol {
   id: string
@@ -22,6 +25,18 @@ const PROTOCOLS: Protocol[] = [
     desc: "Generate a shared secret key using quantum mechanics. An eavesdropper introduces detectable errors.",
   },
   {
+    id: "e91", label: "E91 (Ekert)", subtitle: "Entanglement-Based QKD",
+    tag: "cryptography", tagColor: "#AB47BC",
+    icon: "🔗",
+    desc: "Security proven via Bell inequality violation — any eavesdropper reduces quantum correlations.",
+  },
+  {
+    id: "b92", label: "B92", subtitle: "Simplified QKD",
+    tag: "cryptography", tagColor: "#26A69A",
+    icon: "🔑",
+    desc: "Uses only 2 non-orthogonal states (|0⟩ and |+⟩) — simpler than BB84 but lower key rate.",
+  },
+  {
     id: "teleport", label: "Teleportation", subtitle: "Quantum State Transfer",
     tag: "entanglement", tagColor: "var(--accent-purple)",
     icon: "✦",
@@ -32,6 +47,12 @@ const PROTOCOLS: Protocol[] = [
     tag: "communication", tagColor: "var(--accent-amber)",
     icon: "⇌",
     desc: "Send two classical bits by transmitting a single qubit, exploiting pre-shared entanglement.",
+  },
+  {
+    id: "qec", label: "Error Correction", subtitle: "Detect & Fix Errors",
+    tag: "error correction", tagColor: "#FF6F00",
+    icon: "🛡️",
+    desc: "Encode logical qubits into physical qubits to detect and correct quantum errors via syndrome measurements.",
   },
 ]
 
@@ -91,9 +112,13 @@ export function ProtocolAnimator() {
       {/* ── Main content ── */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {active === "bb84"       && <BB84Animator />}
+        {active === "e91"        && <E91Animator />}
+        {active === "b92"        && <B92Animator />}
         {active === "teleport"   && <TeleportAnimator />}
         {active === "superdense" && <SuperdenseAnimator />}
+        {active === "qec"        && <QECAnimator />}
       </div>
     </div>
   )
 }
+

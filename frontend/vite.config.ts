@@ -22,10 +22,17 @@ export default defineConfig({
     target: 'esnext',
     rollupOptions: {
       output: {
-        manualChunks: {
-          three: ['three', '@react-three/fiber', '@react-three/drei'],
-          d3: ['d3'],
-          reactflow: ['@xyflow/react'],
+        manualChunks(id) {
+          if (id.includes('node_modules/three') || id.includes('@react-three/fiber') || id.includes('@react-three/drei')) {
+            return 'three'
+          }
+          if (id.includes('node_modules/d3')) {
+            return 'd3'
+          }
+          if (id.includes('@xyflow/react')) {
+            return 'reactflow'
+          }
+          return undefined
         },
       },
     },

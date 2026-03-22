@@ -1,4 +1,3 @@
-
 import { useCircuitStore } from "@/store/circuitStore"
 import { useSimStore } from "@/store/simStore"
 import { useNoiseStore } from "@/store/noiseStore"
@@ -15,13 +14,13 @@ export function useCircuit() {
     sim.setLoading(true)
     sim.setError(null)
     try {
-      // Map frontend gate shape to backend snake_case schema
       const gateOps = circuit.gates.map(g => ({
         gate_id: g.gateId,
         qubit: g.qubit,
         step: g.step,
         target_qubit: g.targetQubit ?? null,
         control_qubit: g.controlQubit ?? null,
+        angle: g.angle ?? null,
       }))
       const body = {
         n_qubits: circuit.nQubits,
@@ -38,7 +37,6 @@ export function useCircuit() {
       })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
-      // Map snake_case response back to camelCase
       sim.setResult({
         stateVector: data.state_vector,
         probabilities: data.probabilities,

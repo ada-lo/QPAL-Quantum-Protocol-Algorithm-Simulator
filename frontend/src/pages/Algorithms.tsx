@@ -49,6 +49,12 @@ const ALGORITHMS = [
   { id: "shor",   label: "Shor's Factoring",        tag: "cryptography",  tagColor: "var(--accent-red)" },
   { id: "qft",    label: "Quantum Fourier Transform",tag: "subroutine",   tagColor: "var(--accent-purple)" },
   { id: "qaoa",   label: "QAOA",                    tag: "optimization",  tagColor: "var(--accent-amber)" },
+  { id: "dj",     label: "Deutsch-Jozsa",           tag: "oracle",        tagColor: "#26A69A" },
+  { id: "bv",     label: "Bernstein-Vazirani",      tag: "oracle",        tagColor: "#5C6BC0" },
+  { id: "simon",  label: "Simon's Algorithm",       tag: "period",        tagColor: "#EF6C00" },
+  { id: "qpe",    label: "Phase Estimation",         tag: "subroutine",   tagColor: "#AB47BC" },
+  { id: "vqe",    label: "VQE",                     tag: "variational",   tagColor: "#E91E63" },
+  { id: "qwalk",  label: "Quantum Walk",            tag: "graph",         tagColor: "#00897B" },
 ]
 
 export function Algorithms() {
@@ -95,6 +101,12 @@ export function Algorithms() {
         {algo === "shor"   && <ShorExplorer />}
         {algo === "qft"    && <QFTExplorer />}
         {algo === "qaoa"   && <QAOAExplorer />}
+        {algo === "dj"     && <DeutschJozsaExplorer />}
+        {algo === "bv"     && <BernsteinVaziraniExplorer />}
+        {algo === "simon"  && <SimonExplorer />}
+        {algo === "qpe"    && <QPEExplorer />}
+        {algo === "vqe"    && <VQEExplorer />}
+        {algo === "qwalk"  && <QuantumWalkExplorer />}
       </div>
     </div>
   )
@@ -783,5 +795,811 @@ function MaxCutGraph({ edges }: { edges: [number,number][] }) {
         </g>
       ))}
     </svg>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEUTSCH-JOZSA EXPLORER
+// ─────────────────────────────────────────────────────────────────────────────
+function deutschJozsaOracle(n: number, type: 'constant' | 'balanced', seed: number): (0 | 1)[] {
+  const N = 1 << n
+  if (type === 'constant') return Array(N).fill((seed % 2) as 0 | 1)
+  // Balanced: exactly half zeros, half ones
+  const arr: (0 | 1)[] = Array.from({ length: N }, (_, i) => (i < N / 2 ? 0 : 1))
+  // Deterministic shuffle based on seed
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = ((seed * 31 + i * 17) % (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+function DeutschJozsaExplorer() {
+  const [n, setN] = useState(3)
+  const [type, setType] = useState<'constant' | 'balanced'>('balanced')
+  const [seed, setSeed] = useState(42)
+  const [revealed, setRevealed] = useState(false)
+
+  const N = 1 << n
+  const oracle = useMemo(() => deutschJozsaOracle(n, type, seed), [n, type, seed])
+
+  // Simulate DJ algorithm
+  const result = useMemo(() => {
+    // After H⊗n → Oracle → H⊗n, measure.
+    // If constant → all zeros; if balanced → non-zero
+    const amps = new Array(N).fill(0)
+    // Apply Hadamard to |0...0⟩, oracle, Hadamard
+    for (let x = 0; x < N; x++) {
+      let amp = 0
+      for (let y = 0; y < N; y++) {
+        const phase = oracle[y] === 1 ? -1 : 1
+        // (-1)^(x·y ⊕ f(y))
+        let dot = 0
+        for (let k = 0; k < n; k++) dot += ((x >> k) & 1) * ((y >> k) & 1)
+        amp += (dot % 2 === 0 ? 1 : -1) * phase
+      }
+      amps[x] = amp / N
+    }
+    return amps
+  }, [oracle, N, n])
+
+  const probs = result.map(a => a * a)
+  const isConstant = probs[0] > 0.99
+
+  return (
+    <div style={{ padding: 24, maxWidth: 720 }}>
+      <h2 style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Deutsch-Jozsa Algorithm</h2>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
+        Determines if a function is <strong style={{ color: "#26A69A" }}>constant</strong> (same output for all inputs) or{' '}
+        <strong style={{ color: "#EF6C00" }}>balanced</strong> (outputs 0 for half, 1 for half) with a{' '}
+        <strong style={{ color: "#26A69A" }}>single quantum query</strong> — exponential speedup over classical O(2<sup>n-1</sup>+1).
+      </p>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>Qubits</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[2, 3, 4, 5].map(v => (
+              <button key={v} onClick={() => { setN(v); setRevealed(false) }} style={{
+                padding: "4px 10px", borderRadius: 4, fontSize: 12,
+                background: n === v ? "#26A69A" : "var(--bg-card)",
+                color: n === v ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${n === v ? "#26A69A" : "var(--border)"}`,
+              }}>n={v}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>Oracle type</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {(['constant', 'balanced'] as const).map(t => (
+              <button key={t} onClick={() => { setType(t); setRevealed(false) }} style={{
+                padding: "4px 14px", borderRadius: 4, fontSize: 12, textTransform: "capitalize",
+                background: type === t ? (t === 'constant' ? "#26A69A" : "#EF6C00") : "var(--bg-card)",
+                color: type === t ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${type === t ? (t === 'constant' ? "#26A69A" : "#EF6C00") : "var(--border)"}`,
+              }}>{t}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>Seed</div>
+          <input type="range" min={0} max={100} value={seed}
+            onChange={e => { setSeed(Number(e.target.value)); setRevealed(false) }}
+            style={{ width: 100, accentColor: "#26A69A" }} />
+        </div>
+      </div>
+
+      {/* Circuit diagram */}
+      <div style={{
+        padding: "12px 16px", background: "var(--bg-panel)", borderRadius: 8,
+        border: "1px solid var(--border)", marginBottom: 16, fontFamily: "var(--font-mono)",
+        fontSize: 12, color: "var(--text-secondary)", lineHeight: 2,
+      }}>
+        <div style={{ fontSize: 9, color: "var(--text-muted)", marginBottom: 8 }}>CIRCUIT</div>
+        {Array.from({ length: n }, (_, i) => (
+          <div key={i}>|0⟩ ─── H ─── {i === n - 1 ? "Oracle" : "  ·  "} ─── H ─── M</div>
+        ))}
+      </div>
+
+      {/* Result */}
+      <button onClick={() => setRevealed(true)} style={{
+        padding: "6px 18px", borderRadius: 6, fontSize: 13, fontWeight: 700,
+        background: revealed ? "var(--bg-card)" : "#26A69A", color: revealed ? "var(--text-secondary)" : "#fff",
+        border: `1px solid ${revealed ? "var(--border)" : "#26A69A"}`, marginBottom: 16,
+      }}>{revealed ? "✓ Measured" : "▶ Run & Measure"}</button>
+
+      {revealed && (
+        <div style={{
+          padding: "12px 16px", borderRadius: 8,
+          background: isConstant ? "rgba(38,166,154,0.08)" : "rgba(239,108,0,0.08)",
+          border: `1px solid ${isConstant ? "rgba(38,166,154,0.3)" : "rgba(239,108,0,0.3)"}`,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: isConstant ? "#26A69A" : "#EF6C00", marginBottom: 6 }}>
+            {isConstant ? "CONSTANT — measured |0...0⟩" : "BALANCED — measured non-zero"}
+          </div>
+          <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: 50 }}>
+            {probs.slice(0, Math.min(32, N)).map((p, i) => (
+              <div key={i} style={{
+                width: Math.max(4, Math.floor(200 / N)),
+                height: Math.max(1, p * 48), borderRadius: "2px 2px 0 0",
+                background: i === 0 ? "#26A69A" : p > 0.01 ? "#EF6C00" : "var(--border-bright)",
+                transition: "height 0.3s",
+              }} />
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4, fontFamily: "var(--font-mono)" }}>
+            P(|0...0⟩) = {(probs[0] * 100).toFixed(1)}% — only 1 query used (classical needs {(N / 2 + 1)})
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BERNSTEIN-VAZIRANI EXPLORER
+// ─────────────────────────────────────────────────────────────────────────────
+function BernsteinVaziraniExplorer() {
+  const [n, setN] = useState(4)
+  const [secret, setSecret] = useState(5)  // hidden string s
+  const [revealed, setRevealed] = useState(false)
+
+  const N = 1 << n
+  const secretBits = Array.from({ length: n }, (_, k) => (secret >> k) & 1).reverse()
+
+  // BV result: After H→Oracle(s)→H→Measure, we get |s⟩ directly
+  const resultBits = useMemo(() => {
+    // The algorithm directly outputs s
+    return Array.from({ length: n }, (_, k) => (secret >> k) & 1).reverse()
+  }, [secret, n])
+
+  useEffect(() => { setSecret(s => s % N) }, [N])
+
+  return (
+    <div style={{ padding: 24, maxWidth: 720 }}>
+      <h2 style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Bernstein-Vazirani Algorithm</h2>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
+        Finds a hidden string <strong style={{ color: "#5C6BC0" }}>s</strong> in f(x) = s·x mod 2 with a{' '}
+        <strong style={{ color: "#5C6BC0" }}>single query</strong>. Classically requires n queries.
+      </p>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>Qubits</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[3, 4, 5, 6].map(v => (
+              <button key={v} onClick={() => { setN(v); setSecret(s => s % (1 << v)); setRevealed(false) }} style={{
+                padding: "4px 10px", borderRadius: 4, fontSize: 12,
+                background: n === v ? "#5C6BC0" : "var(--bg-card)",
+                color: n === v ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${n === v ? "#5C6BC0" : "var(--border)"}`,
+              }}>n={v}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Hidden string s</span>
+            <span style={{
+              fontSize: 12, fontFamily: "var(--font-mono)", color: "#5C6BC0", fontWeight: 700,
+            }}>s = {secretBits.join('')}</span>
+          </div>
+          <input type="range" min={0} max={N - 1} value={secret}
+            onChange={e => { setSecret(Number(e.target.value)); setRevealed(false) }}
+            style={{ width: 180, accentColor: "#5C6BC0" }} />
+        </div>
+      </div>
+
+      {/* Oracle truth table */}
+      <div style={{
+        padding: "10px 14px", background: "var(--bg-panel)", borderRadius: 8,
+        border: "1px solid var(--border)", marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 8 }}>
+          ORACLE f(x) = s·x mod 2 — showing first {Math.min(8, N)} of {N} values
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {Array.from({ length: Math.min(8, N) }, (_, x) => {
+            let dot = 0
+            for (let k = 0; k < n; k++) dot += ((secret >> k) & 1) * ((x >> k) & 1)
+            const fx = dot % 2
+            return (
+              <div key={x} style={{
+                padding: "4px 8px", borderRadius: 4, fontSize: 10,
+                fontFamily: "var(--font-mono)", background: "var(--bg-card)",
+                border: "1px solid var(--border)",
+              }}>
+                f({x.toString(2).padStart(n, '0')}) = <span style={{ color: fx ? "#EF5350" : "#66BB6A", fontWeight: 700 }}>{fx}</span>
+              </div>
+            )
+          })}
+          {N > 8 && <span style={{ fontSize: 10, color: "var(--text-muted)", alignSelf: "center" }}>…</span>}
+        </div>
+      </div>
+
+      <button onClick={() => setRevealed(true)} style={{
+        padding: "6px 18px", borderRadius: 6, fontSize: 13, fontWeight: 700,
+        background: revealed ? "var(--bg-card)" : "#5C6BC0", color: revealed ? "var(--text-secondary)" : "#fff",
+        border: `1px solid ${revealed ? "var(--border)" : "#5C6BC0"}`, marginBottom: 16,
+      }}>{revealed ? "✓ String found" : "▶ Run Algorithm"}</button>
+
+      {revealed && (
+        <div style={{
+          padding: "12px 16px", borderRadius: 8, background: "rgba(92,107,192,0.08)",
+          border: "1px solid rgba(92,107,192,0.3)",
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#5C6BC0", marginBottom: 8 }}>
+            Hidden string recovered: s = {resultBits.join('')}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {resultBits.map((b, i) => (
+              <div key={i} style={{
+                width: 32, height: 32, borderRadius: 4,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)",
+                background: b ? "#5C6BC0" : "var(--bg-card)",
+                color: b ? "#fff" : "var(--text-muted)",
+                border: `1px solid ${b ? "#5C6BC0" : "var(--border)"}`,
+              }}>{b}</div>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 8, fontFamily: "var(--font-mono)" }}>
+            1 quantum query vs {n} classical queries
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIMON'S ALGORITHM EXPLORER
+// ─────────────────────────────────────────────────────────────────────────────
+function SimonExplorer() {
+  const [n, setN] = useState(3)
+  const [sIdx, setSIdx] = useState(3)  // Simon's period index
+
+  const N = 1 << n
+  const period = sIdx // period (s value)
+  const periodBits = Array.from({ length: n }, (_, k) => (period >> k) & 1).reverse()
+
+  // Build Simon's oracle: 2-to-1 function with f(x) = f(x ⊕ s)
+  const oracleValues = useMemo(() => {
+    const vals = new Map<number, number>()
+    let nextVal = 0
+    for (let x = 0; x < N; x++) {
+      const xXorS = x ^ period
+      if (vals.has(xXorS)) {
+        vals.set(x, vals.get(xXorS)!)
+      } else {
+        vals.set(x, nextVal++)
+      }
+    }
+    return vals
+  }, [N, period])
+
+  // Simulate collected equations from Simon's iterations
+  const equations = useMemo(() => {
+    const eqs: number[][] = []
+    // Simon's finds y such that y·s = 0 mod 2
+    for (let y = 0; y < N; y++) {
+      let dot = 0
+      for (let k = 0; k < n; k++) dot += ((y >> k) & 1) * ((period >> k) & 1)
+      if (dot % 2 === 0 && y !== 0) {
+        eqs.push(Array.from({ length: n }, (_, k) => (y >> k) & 1).reverse())
+      }
+    }
+    return eqs.slice(0, n)
+  }, [N, n, period])
+
+  return (
+    <div style={{ padding: 24, maxWidth: 720 }}>
+      <h2 style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Simon's Algorithm</h2>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
+        Finds hidden period <strong style={{ color: "#EF6C00" }}>s</strong> of a 2-to-1 function where f(x) = f(x ⊕ s).
+        Exponential speedup: <strong style={{ color: "#EF6C00" }}>O(n)</strong> quantum queries vs O(2<sup>n/2</sup>) classical.
+      </p>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>n</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[2, 3, 4].map(v => (
+              <button key={v} onClick={() => { setN(v); setSIdx(s => Math.min(s, (1 << v) - 1)) }} style={{
+                padding: "4px 10px", borderRadius: 4, fontSize: 12,
+                background: n === v ? "#EF6C00" : "var(--bg-card)",
+                color: n === v ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${n === v ? "#EF6C00" : "var(--border)"}`,
+              }}>{v}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Period s</span>
+            <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "#EF6C00", fontWeight: 700 }}>
+              {periodBits.join('')}
+            </span>
+          </div>
+          <input type="range" min={1} max={N - 1} value={sIdx}
+            onChange={e => setSIdx(Number(e.target.value))}
+            style={{ width: 160, accentColor: "#EF6C00" }} />
+        </div>
+      </div>
+
+      {/* Function table */}
+      <div style={{
+        padding: "10px 14px", background: "var(--bg-panel)", borderRadius: 8,
+        border: "1px solid var(--border)", marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 8 }}>
+          f(x) — 2-to-1 with f(x) = f(x ⊕ {periodBits.join('')})
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(8, N)}, 1fr)`, gap: 4 }}>
+          {Array.from({ length: Math.min(8, N) }, (_, x) => (
+            <div key={x} style={{
+              textAlign: "center", padding: "4px 2px", borderRadius: 4,
+              background: "var(--bg-card)", border: "1px solid var(--border)",
+            }}>
+              <div style={{ fontSize: 8, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+                {x.toString(2).padStart(n, '0')}
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, fontFamily: "var(--font-mono)", color: "#EF6C00" }}>
+                {oracleValues.get(x)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Equations */}
+      <div style={{
+        padding: "10px 14px", background: "var(--bg-panel)", borderRadius: 8,
+        border: "1px solid var(--border)", marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 8 }}>
+          COLLECTED EQUATIONS y·s = 0 mod 2
+        </div>
+        {equations.map((eq, i) => (
+          <div key={i} style={{
+            fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", marginBottom: 4,
+          }}>
+            {eq.map((b, j) => `${b}·s${j}`).join(' + ')} ≡ 0 (mod 2)
+          </div>
+        ))}
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#EF6C00", marginTop: 8 }}>
+          → s = {periodBits.join('')}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QPE EXPLORER
+// ─────────────────────────────────────────────────────────────────────────────
+function QPEExplorer() {
+  const [precision, setPrecision] = useState(4)
+  const [targetPhase, setTargetPhase] = useState(0.25) // θ in U|ψ⟩ = e^{2πiθ}|ψ⟩
+
+  const N = 1 << precision
+
+  // QPE result: peak at k ≈ θ * 2^n
+  const probs = useMemo(() => {
+    return Array.from({ length: N }, (_, k) => {
+      // |1/N * Σ_{j=0}^{N-1} e^{2πi(θ-k/N)j}|²
+      const delta = targetPhase - k / N
+      if (Math.abs(delta * N) < 1e-10) return 1.0
+      const sinNpd = Math.sin(Math.PI * delta * N)
+      const sinpd = Math.sin(Math.PI * delta)
+      return Math.abs(sinpd) < 1e-14 ? 1.0 : (sinNpd / (N * sinpd)) ** 2
+    })
+  }, [precision, targetPhase, N])
+
+  const bestK = probs.indexOf(Math.max(...probs))
+  const estimatedPhase = bestK / N
+
+  return (
+    <div style={{ padding: 24, maxWidth: 720 }}>
+      <h2 style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Quantum Phase Estimation</h2>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
+        Estimates the phase θ in U|ψ⟩ = e<sup>2πiθ</sup>|ψ⟩ to n bits of precision.
+        Core subroutine of <strong style={{ color: "#AB47BC" }}>Shor's algorithm</strong> and quantum chemistry.
+      </p>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>Precision bits</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[3, 4, 5, 6, 8].map(v => (
+              <button key={v} onClick={() => setPrecision(v)} style={{
+                padding: "4px 10px", borderRadius: 4, fontSize: 12,
+                background: precision === v ? "#AB47BC" : "var(--bg-card)",
+                color: precision === v ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${precision === v ? "#AB47BC" : "var(--border)"}`,
+              }}>n={v}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Target phase θ</span>
+            <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "#AB47BC", fontWeight: 700 }}>
+              {targetPhase.toFixed(4)}
+            </span>
+          </div>
+          <input type="range" min={0} max={1} step={0.001} value={targetPhase}
+            onChange={e => setTargetPhase(Number(e.target.value))}
+            style={{ width: "100%", accentColor: "#AB47BC" }} />
+        </div>
+      </div>
+
+      {/* Probability distribution */}
+      <div style={{
+        padding: "14px 16px", background: "var(--bg-panel)", borderRadius: 8,
+        border: "1px solid var(--border)", marginBottom: 16,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            MEASUREMENT PROBABILITIES
+          </span>
+          <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "#AB47BC" }}>
+            estimated θ ≈ {estimatedPhase.toFixed(precision)}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 1, height: 80 }}>
+          {probs.slice(0, Math.min(64, N)).map((p, k) => (
+            <div key={k} style={{
+              flex: 1, height: Math.max(1, p * 76), borderRadius: "2px 2px 0 0",
+              background: k === bestK ? "#AB47BC" : p > 0.01 ? "#7B1FA2" : "var(--border-bright)",
+              transition: "height 0.3s",
+              boxShadow: k === bestK ? "0 0 8px rgba(171,71,188,0.5)" : "none",
+            }} />
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+          <span style={{ fontSize: 7, fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>k=0</span>
+          <span style={{ fontSize: 7, fontFamily: "var(--font-mono)", color: "#AB47BC" }}>↑ k={bestK} → θ≈{estimatedPhase.toFixed(4)}</span>
+          <span style={{ fontSize: 7, fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>k={N - 1}</span>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+        {[
+          { label: "True phase", value: targetPhase.toFixed(4), color: "var(--text-primary)" },
+          { label: "Estimated", value: estimatedPhase.toFixed(4), color: "#AB47BC" },
+          { label: "Error", value: Math.abs(targetPhase - estimatedPhase).toExponential(2), color: Math.abs(targetPhase - estimatedPhase) < 0.01 ? "#66BB6A" : "#EF5350" },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{
+            background: "var(--bg-card)", borderRadius: 8, padding: "10px 12px",
+            border: "1px solid var(--border)",
+          }}>
+            <div style={{ fontSize: 9, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color, fontFamily: "var(--font-mono)" }}>{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VQE EXPLORER
+// ─────────────────────────────────────────────────────────────────────────────
+function VQEExplorer() {
+  const [theta, setTheta] = useState(0.0)
+  const [history, setHistory] = useState<{ theta: number; energy: number }[]>([])
+  const [isRunning, setIsRunning] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setInterval>>()
+
+  // H₂ molecule energy as function of parameterized ansatz (simplified model)
+  // E(θ) = -1.0 + 0.5*cos(θ) + 0.3*cos(2θ)
+  const energy = (t: number) => -1.0 + 0.5 * Math.cos(t) + 0.3 * Math.cos(2 * t)
+  const currentE = energy(theta)
+  const optTheta = Math.PI  // approximate optimal
+  const groundE = energy(optTheta)
+
+  // Simple gradient descent optimizer
+  function runOptimizer() {
+    if (isRunning) { setIsRunning(false); clearInterval(timerRef.current); return }
+    setIsRunning(true)
+    let t = theta
+    const newHistory: typeof history = [...history]
+    let step = 0
+    timerRef.current = setInterval(() => {
+      const grad = (energy(t + 0.01) - energy(t - 0.01)) / 0.02
+      t -= 0.2 * grad
+      newHistory.push({ theta: t, energy: energy(t) })
+      setTheta(t)
+      setHistory([...newHistory])
+      step++
+      if (step > 30 || Math.abs(grad) < 0.001) {
+        setIsRunning(false)
+        clearInterval(timerRef.current)
+      }
+    }, 200)
+  }
+
+  useEffect(() => () => clearInterval(timerRef.current), [])
+
+  const W = 520, H = 120
+  const PAD = { top: 10, right: 12, bottom: 24, left: 40 }
+  const iW = W - PAD.left - PAD.right
+  const iH = H - PAD.top - PAD.bottom
+
+  // Energy landscape curve
+  const nPts = 100
+  const toX = (t: number) => PAD.left + ((t + Math.PI) / (2 * Math.PI)) * iW
+  const eMin = -1.8, eMax = -0.2
+  const toY = (e: number) => PAD.top + ((eMax - e) / (eMax - eMin)) * iH
+
+  const curvePath = Array.from({ length: nPts }, (_, i) => {
+    const t = -Math.PI + (i / (nPts - 1)) * 2 * Math.PI
+    return `${i === 0 ? "M" : "L"}${toX(t).toFixed(1)},${toY(energy(t)).toFixed(1)}`
+  }).join(" ")
+
+  return (
+    <div style={{ padding: 24, maxWidth: 720 }}>
+      <h2 style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
+        Variational Quantum Eigensolver (VQE)
+      </h2>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
+        Find the ground state energy of H₂ molecule using a parameterized quantum circuit.
+        The <strong style={{ color: "#E91E63" }}>quantum computer</strong> evaluates ⟨ψ(θ)|H|ψ(θ)⟩, while a{' '}
+        <strong style={{ color: "var(--text-primary)" }}>classical optimizer</strong> adjusts θ.
+      </p>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 20, alignItems: "center" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Ansatz parameter θ</span>
+            <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "#E91E63", fontWeight: 700 }}>
+              {theta.toFixed(3)}
+            </span>
+          </div>
+          <input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={theta}
+            onChange={e => { setTheta(Number(e.target.value)); setHistory([]) }}
+            style={{ width: "100%", accentColor: "#E91E63" }} />
+        </div>
+        <button onClick={runOptimizer} style={{
+          padding: "6px 18px", fontSize: 12, fontWeight: 700, borderRadius: 6,
+          background: isRunning ? "var(--accent-amber)" : "#E91E63",
+          color: "#fff", border: "none", cursor: "pointer",
+        }}>{isRunning ? "⏸ Stop" : "▶ Optimize"}</button>
+      </div>
+
+      {/* Energy landscape */}
+      <div style={{
+        padding: "10px 14px", background: "var(--bg-panel)", borderRadius: 8,
+        border: "1px solid var(--border)", marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
+          ENERGY LANDSCAPE E(θ) — H₂ MOLECULE
+        </div>
+        <svg width={W} height={H} style={{ display: "block" }}>
+          {[eMin, (eMin + eMax) / 2, eMax].map(e => (
+            <g key={e}>
+              <line x1={PAD.left} x2={W - PAD.right} y1={toY(e)} y2={toY(e)}
+                stroke="var(--border)" strokeWidth={0.5} />
+              <text x={PAD.left - 4} y={toY(e) + 3} fontSize={7}
+                fill="var(--text-muted)" textAnchor="end" fontFamily="var(--font-mono)">{e.toFixed(1)}</text>
+            </g>
+          ))}
+          <path d={curvePath} fill="none" stroke="#E91E63" strokeWidth={2} />
+          {/* Ground state line */}
+          <line x1={PAD.left} x2={W - PAD.right} y1={toY(groundE)} y2={toY(groundE)}
+            stroke="#66BB6A" strokeWidth={0.8} strokeDasharray="3,2" opacity={0.6} />
+          {/* History points */}
+          {history.map((h, i) => (
+            <circle key={i} cx={toX(h.theta)} cy={toY(h.energy)} r={2}
+              fill="rgba(233,30,99,0.4)" />
+          ))}
+          {/* Current position */}
+          <circle cx={toX(theta)} cy={toY(currentE)} r={5}
+            fill="#E91E63" stroke="#fff" strokeWidth={1.5} />
+          <text x={toX(theta)} y={toY(currentE) - 8} textAnchor="middle"
+            fontSize={8} fill="#E91E63" fontWeight={700} fontFamily="var(--font-mono)">
+            E={currentE.toFixed(3)}
+          </text>
+        </svg>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        {[
+          { label: "Current E", value: currentE.toFixed(4) + " Ha", color: "#E91E63" },
+          { label: "Ground state", value: groundE.toFixed(4) + " Ha", color: "#66BB6A" },
+          { label: "Error", value: (currentE - groundE).toFixed(4) + " Ha", color: Math.abs(currentE - groundE) < 0.05 ? "#66BB6A" : "var(--accent-amber)" },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{
+            background: "var(--bg-card)", borderRadius: 8, padding: "10px 12px",
+            border: "1px solid var(--border)",
+          }}>
+            <div style={{ fontSize: 9, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color, fontFamily: "var(--font-mono)" }}>{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUANTUM WALK EXPLORER
+// ─────────────────────────────────────────────────────────────────────────────
+function QuantumWalkExplorer() {
+  const [steps, setSteps] = useState(20)
+  const [coin, setCoin] = useState<'hadamard' | 'biased'>('hadamard')
+
+  const positions = 2 * steps + 1
+  const center = steps
+
+  // Simulate 1D discrete quantum walk
+  const { qProbs, cProbs } = useMemo(() => {
+    // Quantum walk state: |coin⟩ ⊗ |position⟩
+    // coin: 2D (|0⟩, |1⟩), position: (2*steps+1)D
+    const n = positions
+    // State: [re_0, im_0, re_1, im_1] for each position (coin 0 and coin 1)
+    let state = new Float64Array(4 * n)  // [coin0_re, coin0_im, coin1_re, coin1_im] per position
+    // Initialize: |0⟩_coin ⊗ |center⟩_position
+    state[4 * center] = 1  // coin0_re at center
+
+    // Coin operator (Hadamard or biased)
+    const c00 = coin === 'hadamard' ? 1 / Math.sqrt(2) : 0.8
+    const c01 = coin === 'hadamard' ? 1 / Math.sqrt(2) : 0.6
+    const c10 = coin === 'hadamard' ? 1 / Math.sqrt(2) : 0.6
+    const c11 = coin === 'hadamard' ? -1 / Math.sqrt(2) : -0.8
+
+    for (let step = 0; step < steps; step++) {
+      // Apply coin
+      const after_coin = new Float64Array(4 * n)
+      for (let p = 0; p < n; p++) {
+        const a0r = state[4 * p], a0i = state[4 * p + 1]
+        const a1r = state[4 * p + 2], a1i = state[4 * p + 3]
+        after_coin[4 * p] = c00 * a0r + c01 * a1r
+        after_coin[4 * p + 1] = c00 * a0i + c01 * a1i
+        after_coin[4 * p + 2] = c10 * a0r + c11 * a1r
+        after_coin[4 * p + 3] = c10 * a0i + c11 * a1i
+      }
+      // Apply shift: |0⟩ → move left, |1⟩ → move right
+      const next = new Float64Array(4 * n)
+      for (let p = 0; p < n; p++) {
+        if (p > 0) {
+          next[4 * (p - 1)] += after_coin[4 * p]
+          next[4 * (p - 1) + 1] += after_coin[4 * p + 1]
+        }
+        if (p < n - 1) {
+          next[4 * (p + 1) + 2] += after_coin[4 * p + 2]
+          next[4 * (p + 1) + 3] += after_coin[4 * p + 3]
+        }
+      }
+      state = next
+    }
+
+    // Compute quantum probabilities
+    const qProbs = Array.from({ length: n }, (_, p) => {
+      return state[4 * p] ** 2 + state[4 * p + 1] ** 2 +
+             state[4 * p + 2] ** 2 + state[4 * p + 3] ** 2
+    })
+
+    // Compute classical random walk for comparison
+    const cProbs = new Array(n).fill(0)
+    cProbs[center] = 1
+    for (let step = 0; step < steps; step++) {
+      const next = new Array(n).fill(0)
+      for (let p = 0; p < n; p++) {
+        if (p > 0) next[p - 1] += cProbs[p] * 0.5
+        if (p < n - 1) next[p + 1] += cProbs[p] * 0.5
+      }
+      for (let p = 0; p < n; p++) cProbs[p] = next[p]
+    }
+
+    return { qProbs, cProbs }
+  }, [steps, coin, positions, center])
+
+  const maxQ = Math.max(...qProbs, 0.001)
+  const maxC = Math.max(...cProbs, 0.001)
+  const maxP = Math.max(maxQ, maxC)
+  const barH = 100
+
+  return (
+    <div style={{ padding: 24, maxWidth: 720 }}>
+      <h2 style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Quantum Walk</h2>
+      <p style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.7, marginBottom: 20 }}>
+        1D discrete quantum walk: a quantum particle spreads{' '}
+        <strong style={{ color: "#00897B" }}>ballistically (∝ t)</strong> compared to classical random walk's{' '}
+        <strong style={{ color: "var(--text-muted)" }}>diffusive spread (∝ √t)</strong>.
+        Basis for quantum search algorithms on graphs.
+      </p>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Steps</span>
+            <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "#00897B", fontWeight: 700 }}>{steps}</span>
+          </div>
+          <input type="range" min={1} max={40} value={steps} onChange={e => setSteps(Number(e.target.value))}
+            style={{ width: "100%", accentColor: "#00897B" }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 6 }}>Coin</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {(['hadamard', 'biased'] as const).map(c => (
+              <button key={c} onClick={() => setCoin(c)} style={{
+                padding: "4px 10px", borderRadius: 4, fontSize: 11, textTransform: "capitalize",
+                background: coin === c ? "#00897B" : "var(--bg-card)",
+                color: coin === c ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${coin === c ? "#00897B" : "var(--border)"}`,
+              }}>{c}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Probability distribution */}
+      <div style={{
+        padding: "14px 16px", background: "var(--bg-panel)", borderRadius: 8,
+        border: "1px solid var(--border)", marginBottom: 16,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+            POSITION PROBABILITY after {steps} steps
+          </span>
+          <div style={{ display: "flex", gap: 12 }}>
+            <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 10, height: 3, background: "#00897B", borderRadius: 1, display: "inline-block" }} />
+              <span style={{ color: "#00897B" }}>quantum</span>
+            </span>
+            <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 10, height: 3, background: "var(--border-bright)", borderRadius: 1, display: "inline-block" }} />
+              <span style={{ color: "var(--text-muted)" }}>classical</span>
+            </span>
+          </div>
+        </div>
+        <div style={{ position: "relative", height: barH + 4, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", height: barH, gap: 0, position: "absolute", bottom: 0, left: 0, right: 0 }}>
+            {qProbs.map((p, i) => (
+              <div key={`q-${i}`} style={{
+                flex: 1, height: Math.max(0.5, (p / maxP) * barH),
+                background: "#00897B", opacity: 0.7,
+                borderRadius: "1px 1px 0 0",
+                transition: "height 0.3s",
+              }} />
+            ))}
+          </div>
+          {/* Classical overlay as line */}
+          <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: barH + 4 }}
+            viewBox={`0 0 ${positions} ${barH}`} preserveAspectRatio="none">
+            <polyline
+              points={cProbs.map((p, i) => `${i + 0.5},${barH - (p / maxP) * barH}`).join(" ")}
+              fill="none" stroke="var(--border-bright)" strokeWidth={1.5}
+            />
+          </svg>
+        </div>
+        <div style={{
+          display: "flex", justifyContent: "space-between", marginTop: 4,
+          fontSize: 7, fontFamily: "var(--font-mono)", color: "var(--text-muted)",
+        }}>
+          <span>-{steps}</span>
+          <span>0</span>
+          <span>+{steps}</span>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {[
+          { label: "Quantum spread", value: `∝ ${steps} (ballistic)`, color: "#00897B" },
+          { label: "Classical spread", value: `∝ √${steps} ≈ ${Math.sqrt(steps).toFixed(1)} (diffusive)`, color: "var(--text-muted)" },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{
+            background: "var(--bg-card)", borderRadius: 8, padding: "10px 12px",
+            border: "1px solid var(--border)",
+          }}>
+            <div style={{ fontSize: 9, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color, fontFamily: "var(--font-mono)" }}>{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
