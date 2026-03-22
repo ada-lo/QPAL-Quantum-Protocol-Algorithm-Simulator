@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { NoiseOverlay } from "./NoiseOverlay"
 
 type Basis = "+" | "x"
 type Bit   = 0 | 1
@@ -294,6 +295,9 @@ export function BB84Animator() {
           )}
         </>
       )}
+
+      {/* Gap 2 — Noise overlay */}
+      <NoiseOverlay />
     </div>
   )
 }

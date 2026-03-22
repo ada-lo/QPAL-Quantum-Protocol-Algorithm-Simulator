@@ -1,5 +1,6 @@
 
 import { useState } from "react"
+import { NoiseOverlay } from "./NoiseOverlay"
 
 interface Step {
   label: string
@@ -214,6 +215,9 @@ export function TeleportAnimator() {
           {step + 1}/{STEPS.length}
         </span>
       </div>
+
+      {/* Gap 2 — Noise overlay */}
+      <NoiseOverlay />
     </div>
   )
 }

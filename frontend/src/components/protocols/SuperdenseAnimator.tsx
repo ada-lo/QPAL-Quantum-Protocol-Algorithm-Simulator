@@ -1,5 +1,6 @@
 
 import { useState } from "react"
+import { NoiseOverlay } from "./NoiseOverlay"
 
 const BELL: Record<string, { state: string; ops: string; circuit: string[] }> = {
   "00": { state: "|Φ+⟩ = (|00⟩+|11⟩)/√2", ops: "Identity (I)",   circuit: ["·","·"] },
@@ -161,6 +162,9 @@ export function SuperdenseAnimator() {
           </tbody>
         </table>
       </div>
+
+      {/* Gap 2 — Noise overlay */}
+      <NoiseOverlay />
     </div>
   )
 }

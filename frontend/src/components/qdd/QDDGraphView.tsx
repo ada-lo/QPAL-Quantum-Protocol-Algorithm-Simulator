@@ -6,6 +6,7 @@ import { compressionRatio, syntheticQDD, type QDDGraph } from "@/lib/qdd/graph"
 import { layoutQDD } from "@/lib/qdd/layout"
 import { QDDNodeViz } from "./QDDNodeViz"
 import { ComplexityMeter } from "./ComplexityMeter"
+import { GHZDemo } from "./GHZDemo"
 
 type DemoType = "bell" | "ghz" | "grover" | "random"
 
@@ -190,6 +191,13 @@ export function QDDGraphView() {
           </div>
         ))}
       </div>
+
+      {/* GHZ deep-dive demo (Gap 3 proof) */}
+      {!isLive && demoType === "ghz" && (
+        <div style={{ borderTop: "1px solid var(--border)", flexShrink: 0 }}>
+          <GHZDemo />
+        </div>
+      )}
     </div>
   )
 }

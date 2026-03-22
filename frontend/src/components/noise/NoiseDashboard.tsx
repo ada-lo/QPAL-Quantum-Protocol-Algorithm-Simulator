@@ -3,11 +3,15 @@ import { NoiseModelSelector } from "./NoiseModelSelector"
 import { DecoherencePanel } from "./DecoherencePanel"
 import { FidelityChart } from "./FidelityChart"
 import { BlochBallViz } from "./BlochBallViz"
+import { BlochComparison } from "./BlochComparison"
+import { FidelityProofDemo } from "./FidelityProofDemo"
 import { useNoise } from "@/hooks/useNoise"
+import { useState } from "react"
 
 export function NoiseDashboard() {
   const { activeModel } = useNoise()
   const isNoisy = activeModel !== "ideal"
+  const [showComparison, setShowComparison] = useState(false)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "auto" }}>
@@ -22,9 +26,33 @@ export function NoiseDashboard() {
 
       {isNoisy ? (
         <>
-          <BlochBallViz />
+          {/* Toggle: single Bloch ball vs side-by-side comparison */}
+          <div style={{
+            padding: "4px 14px", display: "flex", gap: 6, alignItems: "center",
+          }}>
+            <button onClick={() => setShowComparison(false)} style={{
+              fontSize: 9, fontFamily: "var(--font-mono)", padding: "2px 8px",
+              borderRadius: "var(--radius-sm)", cursor: "pointer",
+              background: !showComparison ? "var(--accent-cyan)" : "var(--bg-card)",
+              color: !showComparison ? "#000" : "var(--text-muted)",
+              border: `1px solid ${!showComparison ? "var(--accent-cyan)" : "var(--border)"}`,
+            }}>Single</button>
+            <button onClick={() => setShowComparison(true)} style={{
+              fontSize: 9, fontFamily: "var(--font-mono)", padding: "2px 8px",
+              borderRadius: "var(--radius-sm)", cursor: "pointer",
+              background: showComparison ? "var(--accent-cyan)" : "var(--bg-card)",
+              color: showComparison ? "#000" : "var(--text-muted)",
+              border: `1px solid ${showComparison ? "var(--accent-cyan)" : "var(--border)"}`,
+            }}>Compare ⟷</button>
+          </div>
+
+          {showComparison ? <BlochComparison /> : <BlochBallViz />}
+
           <DecoherencePanel />
           <FidelityChart />
+
+          {/* Gap 2 research proof: fidelity below 50% */}
+          {activeModel === "thermal" && <FidelityProofDemo />}
         </>
       ) : (
         <div style={{

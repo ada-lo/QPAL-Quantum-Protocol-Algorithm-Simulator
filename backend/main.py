@@ -7,6 +7,8 @@ from api.routes.simulate import router as sim_router
 from api.routes.protocols import router as proto_router
 from api.routes.noise import router as noise_router
 from api.routes.qdd import router as qdd_router
+from api.routes.algorithms import router as algo_router
+from api.routes.ghz import router as ghz_router
 from api.routes.health import router as health_router
 
 load_dotenv()
@@ -31,6 +33,8 @@ app.include_router(sim_router,   prefix="/api")
 app.include_router(proto_router, prefix="/api")
 app.include_router(noise_router, prefix="/api")
 app.include_router(qdd_router,   prefix="/api")
+app.include_router(algo_router,  prefix="/api")
+app.include_router(ghz_router,   prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
