@@ -21,7 +21,8 @@ function parseLine(line, lineNumber) {
 
   // Handle comments
   if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
-    return { type: 'COMMENT', text: trimmed.slice(1).trim(), lineNumber };
+    const text = trimmed.startsWith('//') ? trimmed.slice(2).trim() : trimmed.slice(1).trim();
+    return { type: 'COMMENT', text, lineNumber };
   }
 
   const tokens = trimmed.split(/\s+/);

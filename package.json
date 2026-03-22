@@ -1,0 +1,8 @@
+{
+  "name": "qpal-quantum-protocol-algorithm-simulator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run-all-tests.js"
+  }
+}

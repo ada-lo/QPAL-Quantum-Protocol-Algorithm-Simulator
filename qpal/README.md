@@ -1,235 +1,136 @@
 # QPAL — Quantum Protocol & Algorithm Simulator
 
-A web-based interactive simulator for exploring quantum algorithms and cryptographic protocols.
+QPAL is a browser-based simulator for learning quantum algorithms and quantum communication protocols through code, visualization, and controlled experimentation.
 
----
+## Quick Start
 
-## 🚀 Quick Start
+Open `index.html` in a modern browser. No bundler, server, or install step is required for the standalone app.
 
-Open `index.html` in any modern browser. No build step, no server required.
+For local validation:
 
----
-
-## 1. Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                        QPAL System                       │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌──────────┐    ┌──────────┐    ┌──────────────────┐  │
-│  │   User   │───▶│  Parser  │───▶│ Simulation Engine │  │
-│  │  Input   │    │          │    │                  │  │
-│  │ (editor) │    │ Text →   │    │ QuantumEngine    │  │
-│  └──────────┘    │ JSON AST │    │ ExecutionCtrl    │  │
-│                  └──────────┘    └────────┬─────────┘  │
-│                                           │             │
-│  ┌────────────────────────────────────────▼──────────┐  │
-│  │               React/HTML UI Layer                  │  │
-│  │                                                    │  │
-│  │  ┌───────────┐  ┌────────────┐  ┌─────────────┐  │  │
-│  │  │ModeSelector│  │Circuit Viz │  │Protocol Flow│  │  │
-│  │  └───────────┘  └────────────┘  └─────────────┘  │  │
-│  │  ┌───────────┐  ┌────────────┐  ┌─────────────┐  │  │
-│  │  │CodeEditor │  │State Panel │  │ Output Log  │  │  │
-│  │  └───────────┘  └────────────┘  └─────────────┘  │  │
-│  └────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+```bash
+npm test
 ```
 
-### Data Flow
+## Product Focus
 
+QPAL is built around three pillars:
+
+1. Algorithm Mode
+2. Protocol Mode
+3. Code Interface
+
+### 1. Algorithm Mode
+
+Implemented algorithm presets:
+
+- Bell State
+- GHZ State
+- Quantum Teleportation
+- Superdense Coding
+- Deutsch's Algorithm
+- SWAP Test
+- Custom Algorithm
+
+### 2. Protocol Mode
+
+Implemented protocol presets:
+
+- BB84
+- E91
+- Quantum Teleportation Protocol
+- Superdense Coding Protocol
+- Custom Protocol
+
+BB84 and E91 both include statistical security summaries with Eve toggling.
+
+### 3. Code Interface
+
+Supported pseudo-language commands:
+
+```text
+INIT <qubit>
+H <qubit>
+X <qubit>
+CNOT <control> <target>
+MEASURE <qubit> [BASIS X|Z]
+ACTOR <name>
+ASSIGN <qubit> <actor>
+SEND <qubit> <from> <to>
+INTERCEPT <qubit> <actor>
 ```
-User types code
-      │
-      ▼
+
+## Architecture
+
+```text
+User Input / Preset
+        ↓
 parseProgram(code)
-      │ → [{ type, qubit, lineNumber, ... }, ...]
-      │ → errors[]
-      ▼
+        ↓
 ExecutionController.load(instructions)
-      │
-      ▼
-stepForward() or runAll()
-      │
-      ▼
-QuantumEngine.executeInstruction(inst)
-      │ → { log, effect, stateAfter }
-      ▼
-UI renders: Circuit / State / Protocol / Log
+        ↓
+QuantumEngine.executeInstruction(...)
+        ↓
+Circuit / State / Channel / Analytics UI
 ```
 
----
+## Project Structure
 
-## 2. Project Structure
-
-```
+```text
 qpal/
-├── index.html              ← Complete standalone app (all-in-one)
-├── README.md               ← This file
-├── src/                    ← Modular source files (for React build)
-│   ├── parser/
-│   │   └── parser.js       ← Pseudo-code → JSON instruction objects
-│   ├── engine/
-│   │   ├── engine.js       ← Quantum gate simulation
-│   │   └── controller.js   ← Step-by-step execution management
-│   └── presets/
-│       ├── bellState.js    ← Bell state preset + templates
-│       └── bb84.js         ← BB84 protocol + statistical simulation
+├── index.html
+├── README.md
+└── src/
+    ├── engine/
+    │   ├── controller.js
+    │   └── engine.js
+    ├── parser/
+    │   └── parser.js
+    └── presets/
+        ├── advancedAlgorithms.js
+        ├── advancedProtocols.js
+        ├── bb84.js
+        ├── bellState.js
+        ├── catalog.js
+        └── protocolAnalytics.js
 ```
 
----
+## Standalone App vs Modular Source
 
-## 3. Pseudo-language Reference
+- `index.html` is the full runnable standalone application
+- `src/` contains the reusable logic and preset catalog mirrored from the standalone app
 
-```
-# Comments start with # or //
+This keeps the project easy to demo while also making the source easier to extend and test.
 
-# Qubit Operations
-INIT q0              # Initialize qubit to |0⟩
-H q0                 # Hadamard gate (superposition)
-X q0                 # Pauli-X / NOT gate (flip)
-CNOT q0 q1           # Controlled-NOT (entangle)
-MEASURE q0           # Measure in Z basis (default)
-MEASURE q0 BASIS X   # Measure in X basis
-MEASURE q0 BASIS Z   # Measure in Z basis
+## Simulation Model
 
-# Protocol Operations
-ACTOR Alice          # Declare a protocol participant
-ASSIGN q0 Alice      # Give qubit ownership to actor
-SEND q0 Alice Bob    # Transmit qubit between actors
-INTERCEPT q0 Eve     # Eve intercepts (introduces errors)
-```
+QPAL uses a simplified flag-based quantum model for teaching:
 
-### Rules
-- One command per line
-- Case insensitive
-- Qubit names: any identifier (q0, qubit_A, etc.)
-- Actor names: any identifier (Alice, Bob, Eve, etc.)
-- Invalid commands produce parse errors with line numbers
+- `value`
+- `superposition`
+- `entangledWith`
+- `measured`
+- `owner`
 
----
+This makes the UI easy to follow and supports protocol storytelling, while keeping implementation simple and hackable.
 
-## 4. Simulation Model (Simplified Quantum Logic)
+## Testing
 
-Rather than full linear algebra (density matrices, tensor products), QPAL uses a flag-based model:
+The repository includes lightweight regression tests for:
 
-| Property | Description |
-|----------|-------------|
-| `value` | Classical value: 0 or 1 |
-| `superposition` | Boolean flag: in quantum superposition |
-| `entangledWith` | Name of entangled partner qubit |
-| `measured` | Whether qubit has been collapsed |
-| `owner` | Protocol actor who holds the qubit |
+- parser behavior
+- preset catalog coverage
+- BB84 analytics
+- E91 analytics
 
-### Gate Logic
+## Next Extensions
 
-| Gate | Effect |
-|------|--------|
-| `H` | Sets `superposition = true`; double-H collapses back |
-| `X` | Flips `value` (0↔1) |
-| `CNOT` | If control is |1⟩, flips target; creates entanglement link |
-| `MEASURE` | Collapses superposition randomly (50/50); updates entangled partner |
-| `INTERCEPT` | Eve measures in random basis, re-prepares qubit — may introduce error |
-
----
-
-## 5. Presets
-
-### Bell State (Algorithm Mode)
-Demonstrates quantum entanglement:
-1. `INIT q0, q1` → both start at |0⟩
-2. `H q0` → q0 enters superposition |+⟩
-3. `CNOT q0 q1` → creates entangled pair |Φ+⟩ = (|00⟩ + |11⟩)/√2
-4. `MEASURE` → both qubits always collapse to the same value
-
-### BB84 Protocol (Protocol Mode)
-Demonstrates quantum key distribution:
-- Alice prepares qubits in random bases
-- Eve optionally intercepts (introduces ~25% errors)
-- Bob measures in random bases
-- Error rate > 11% → eavesdropping detected
-
-The **statistical BB84 panel** runs 16 rounds, showing:
-- Per-bit basis comparison table
-- Error rate calculation
-- Shared key generation
-- Eavesdropping detection alert
-
----
-
-## 6. Example Inputs
-
-### Bell State
-```
-INIT q0
-INIT q1
-H q0
-CNOT q0 q1
-MEASURE q0 BASIS Z
-MEASURE q1 BASIS Z
-```
-
-### BB84 with Eve
-```
-ACTOR Alice
-ACTOR Bob
-ACTOR Eve
-INIT q0
-H q0
-ASSIGN q0 Alice
-INTERCEPT q0 Eve
-SEND q0 Alice Bob
-MEASURE q0 BASIS Z
-```
-
-### Custom: GHZ State (3-qubit entanglement)
-```
-INIT q0
-INIT q1
-INIT q2
-H q0
-CNOT q0 q1
-CNOT q0 q2
-MEASURE q0 BASIS Z
-MEASURE q1 BASIS Z
-MEASURE q2 BASIS Z
-```
-
----
-
-## 7. UI Controls
-
-| Control | Action |
-|---------|--------|
-| **▶ Run** | Parse and execute all instructions at once |
-| **⏭ Step** | Execute one instruction at a time |
-| **↺ Reset** | Clear state and log |
-| **Circuit tab** | Show qubit wires and gate boxes |
-| **State tab** | Show qubit state cards with properties |
-| **Channel tab** | Show protocol actor flow and channel events |
-
----
-
-## 8. Future Extensions
-
-### Near-term
-- **Noise simulation**: Add configurable depolarizing noise to MEASURE and SEND
-- **Bloch sphere**: Visualize single qubit state as 3D vector
-- **More presets**: Quantum teleportation, superdense coding, Grover's algorithm
-
-### Medium-term
-- **Multi-qubit scaling**: Support 4+ qubit circuits with proper entanglement
-- **State vector display**: Show probability amplitudes for N-qubit systems
-- **Export**: Save circuit diagrams as SVG or PDF
-
-### Long-term
-- **Backend integration**: Connect to real quantum simulators (Qiskit, Cirq)
-- **Collaborative mode**: Share circuits via URL
-- **Lesson mode**: Guided tutorials with checkpoints
-
----
+- conditional correction gates for protocol examples
+- richer gate coverage
+- noise-aware channels
+- SVG/JSON export
+- optional integration with external quantum SDKs
 
 ## License
 
-MIT — built for educational purposes.
+MIT

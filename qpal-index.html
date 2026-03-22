@@ -1003,7 +1003,8 @@ function parseLine(line, lineNumber) {
   const trimmed = line.trim();
   if (!trimmed) return null;
   if (trimmed.startsWith('#') || trimmed.startsWith('//')) {
-    return { type: 'COMMENT', text: trimmed.slice(1).trim(), lineNumber };
+    const text = trimmed.startsWith('//') ? trimmed.slice(2).trim() : trimmed.slice(1).trim();
+    return { type: 'COMMENT', text, lineNumber };
   }
   const tokens = trimmed.split(/\s+/);
   const command = tokens[0].toUpperCase();
@@ -1588,7 +1589,8 @@ let controller = new ExecutionController();
 let allStepResults = [];
 let currentStepIdx = -1;
 let parsedInstructions = [];
-let bb84SimData = null;
+let protocolSimData = null;
+let protocolSimType = null;
 let eveActive = true;
 
 // ═══════════════════════════════════════════════
@@ -1658,9 +1660,9 @@ function runAll() {
   if (errors.length > 0) {
     showParseErrors(errors); return;
   }
-  // Special BB84 simulation
-  if (activePreset === 'bb84') {
-    runBB84Sim();
+  // Statistical protocol overlays
+  if (activePreset === 'bb84' || activePreset === 'e91') {
+    runProtocolSimulation(activePreset);
     return;
   }
   allStepResults = controller.runAll();
@@ -1685,7 +1687,8 @@ function resetSim(clearLog = true) {
   allStepResults = [];
   currentStepIdx = -1;
   parsedInstructions = [];
-  bb84SimData = null;
+  protocolSimData = null;
+  protocolSimType = null;
   if (clearLog) {
     document.getElementById('output-content').innerHTML =
       '<div class="empty-state" style="height:100px"><div class="empty-text">Execution log will appear here...</div></div>';
@@ -1743,7 +1746,7 @@ function renderLog() {
 // VISUALIZATION RENDERING
 // ═══════════════════════════════════════════════
 function renderViz() {
-  if (bb84SimData) { renderBB84Viz(); return; }
+  if (protocolSimData) { renderProtocolAnalytics(); return; }
   if (allStepResults.length === 0) return;
 
   const state = controller.engine.getState();
@@ -1912,16 +1915,24 @@ function renderProtocolPanel(state, container) {
 // ═══════════════════════════════════════════════
 // BB84 SIMULATION (Statistical)
 // ═══════════════════════════════════════════════
-function runBB84Sim() {
-  // Run the pseudo-code simulation
+function runProtocolSimulation(type) {
   allStepResults = controller.runAll();
   currentStepIdx = allStepResults.length - 1;
-
-  // Also run statistical BB84 simulation
-  bb84SimData = runStatBB84(16, eveActive);
-  renderBB84Viz();
+  protocolSimType = type;
+  protocolSimData = type === 'e91'
+    ? runStatE91(12, eveActive)
+    : runStatBB84(16, eveActive);
+  renderProtocolAnalytics();
   renderLog();
   updateProgressBadge();
+}
+
+function runBB84Sim() {
+  runProtocolSimulation('bb84');
+}
+
+function runE91Sim() {
+  runProtocolSimulation('e91');
 }
 
 function updateProgressBadge() {
@@ -1954,9 +1965,44 @@ function runStatBB84(numBits, withEve) {
   return { results, matching:matching.length, errors:errors.length, errorRate:parseFloat(errorRate), sharedKey, eveDetected: parseFloat(errorRate) > 11 };
 }
 
+function runStatE91(numPairs, withEve) {
+  const bases = ['Z','X'];
+  const results = [];
+  for (let i = 0; i < numPairs; i++) {
+    const ab = bases[Math.floor(Math.random()*2)];
+    const bb = bases[Math.floor(Math.random()*2)];
+    const av = Math.random() < 0.5 ? 0 : 1;
+    let bv = av;
+    let eb = null;
+    if (withEve) {
+      eb = bases[Math.floor(Math.random()*2)];
+      if (eb !== ab) bv = Math.random() < 0.5 ? 0 : 1;
+    }
+    if (bb !== ab) bv = Math.random() < 0.5 ? 0 : 1;
+    const match = ab === bb;
+    const correlated = av === bv;
+    const err = match && !correlated;
+    results.push({ pair:i, aliceBasis:ab, aliceValue:av, eveBasis:eb, eveIntercept:withEve, bobBasis:bb, bobValue:bv, basesMatch:match, correlated, error:err });
+  }
+  const matching = results.filter(r=>r.basesMatch);
+  const errors = matching.filter(r=>r.error);
+  const errorRate = matching.length > 0 ? ((errors.length/matching.length)*100).toFixed(1) : '0.0';
+  const sharedKey = matching.filter(r=>!r.error).map(r=>r.aliceValue);
+  return { results, matching:matching.length, errors:errors.length, errorRate:parseFloat(errorRate), sharedKey, eveDetected: parseFloat(errorRate) > 11 };
+}
+
+function renderProtocolAnalytics() {
+  if (!protocolSimData) return;
+  if (protocolSimType === 'e91') {
+    renderE91Viz();
+    return;
+  }
+  renderBB84Viz();
+}
+
 function renderBB84Viz() {
-  if (!bb84SimData) return;
-  const d = bb84SimData;
+  if (!protocolSimData || protocolSimType !== 'bb84') return;
+  const d = protocolSimData;
   const container = document.getElementById('viz-content');
 
   const eveToggle = `
@@ -2024,7 +2070,86 @@ function renderBB84Viz() {
     </div>`;
 
   const rerunBtn = `<div style="margin-top:12px">
-    <button class="btn btn-step" onclick="rerunBB84()" style="width:auto;padding:8px 20px">
+    <button class="btn btn-step" onclick="rerunProtocolSimulation()" style="width:auto;padding:8px 20px">
+      🔄 Re-run Simulation
+    </button>
+  </div>`;
+
+  container.innerHTML = eveToggle + alert + stats + keySection + table + rerunBtn;
+  document.getElementById('log-badge').textContent = `${allStepResults.length} events`;
+}
+
+function renderE91Viz() {
+  if (!protocolSimData || protocolSimType !== 'e91') return;
+  const d = protocolSimData;
+  const container = document.getElementById('viz-content');
+
+  const eveToggle = `
+    <div class="eve-toggle">
+      <div class="toggle-switch ${eveActive?'on':''}" onclick="toggleEve()">
+        <div class="toggle-knob"></div>
+      </div>
+      <div>
+        <div class="toggle-label" style="color:${eveActive?'var(--danger)':'var(--text2)'}">🕵️ Eve Active: ${eveActive?'YES':'NO'}</div>
+        <div class="toggle-desc">Toggle Eve's disturbance of the entangled channel</div>
+      </div>
+    </div>`;
+
+  const alert = d.eveDetected
+    ? `<div class="alert alert-danger">⚠️ CORRELATION BROKEN — Error rate ${d.errorRate}% exceeds the ${11}% threshold. Entanglement channel is not trusted.</div>`
+    : `<div class="alert alert-success">✅ Correlations look healthy — Error rate ${d.errorRate}% stays within the acceptable threshold.</div>`;
+
+  const stats = `
+    <div class="bb84-stats">
+      <div class="stat-card stat-info"><div class="stat-value">${d.results.length}</div><div class="stat-label">Pairs Sent</div></div>
+      <div class="stat-card stat-success"><div class="stat-value">${d.matching}</div><div class="stat-label">Matching Bases</div></div>
+      <div class="stat-card stat-danger"><div class="stat-value">${d.errors}</div><div class="stat-label">Correlation Errors</div></div>
+      <div class="stat-card ${d.errorRate > 11 ? 'stat-danger' : 'stat-success'}"><div class="stat-value">${d.errorRate}%</div><div class="stat-label">Error Rate</div></div>
+    </div>`;
+
+  const keyBits = d.sharedKey.map(b =>
+    `<span class="${b===0?'key-bit-0':'key-bit-1'}">${b}</span>`).join('');
+  const keySection = `
+    <div style="margin-top:12px">
+      <div class="section-label" style="margin-bottom:6px">// Shared Key (${d.sharedKey.length} bits)</div>
+      <div class="key-display">${keyBits || '<span style="color:var(--text3)">No key — correlations are too weak</span>'}</div>
+    </div>`;
+
+  const tableRows = d.results.map(r => {
+    const cls = r.basesMatch ? (r.error ? 'error-row' : 'match') : '';
+    const eveTd = r.eveIntercept
+      ? `<td class="eve-col ${r.eveBasis!==r.aliceBasis?'':''}">
+          ${r.eveBasis} ${r.eveBasis!==r.aliceBasis?'⚠':' '}</td>`
+      : `<td style="color:var(--text3)">—</td>`;
+    return `<tr class="${cls}">
+      <td style="color:var(--text3)">${r.pair}</td>
+      <td class="basis-${r.aliceBasis}">${r.aliceBasis}</td>
+      <td style="color:var(--text)">${r.aliceValue}</td>
+      ${eveTd}
+      <td class="basis-${r.bobBasis}">${r.bobBasis}</td>
+      <td style="color:var(--text)">${r.bobValue}</td>
+      <td>${r.basesMatch ? (r.correlated ? '<span style="color:var(--accent3)">✓</span>' : '<span style="color:var(--danger)">✗</span>') : '<span style="color:var(--text3)">-</span>'}</td>
+      <td>${r.error?'<span style="color:var(--danger)">ERR</span>':'<span style="color:var(--text3)">-</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  const table = `
+    <div style="margin-top:12px;overflow-x:auto">
+      <div class="section-label" style="margin-bottom:6px">// Entangled Pair Analysis</div>
+      <table class="bb84-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Alice Basis</th><th>Alice Val</th>
+            <th>Eve Basis</th>
+            <th>Bob Basis</th><th>Bob Val</th><th>Correlated</th><th>Error</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>`;
+
+  const rerunBtn = `<div style="margin-top:12px">
+    <button class="btn btn-step" onclick="rerunProtocolSimulation()" style="width:auto;padding:8px 20px">
       🔄 Re-run Simulation
     </button>
   </div>`;
@@ -2035,13 +2160,23 @@ function renderBB84Viz() {
 
 function toggleEve() {
   eveActive = !eveActive;
-  bb84SimData = runStatBB84(16, eveActive);
-  renderBB84Viz();
+  if (!protocolSimType) return;
+  protocolSimData = protocolSimType === 'e91'
+    ? runStatE91(12, eveActive)
+    : runStatBB84(16, eveActive);
+  renderProtocolAnalytics();
+}
+
+function rerunProtocolSimulation() {
+  if (!protocolSimType) return;
+  protocolSimData = protocolSimType === 'e91'
+    ? runStatE91(12, eveActive)
+    : runStatBB84(16, eveActive);
+  renderProtocolAnalytics();
 }
 
 function rerunBB84() {
-  bb84SimData = runStatBB84(16, eveActive);
-  renderBB84Viz();
+  rerunProtocolSimulation();
 }
 
 // ═══════════════════════════════════════════════

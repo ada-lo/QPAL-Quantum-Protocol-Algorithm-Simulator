@@ -3,6 +3,8 @@
  * Simulates the BB84 protocol with Alice, Bob, and optional Eve
  */
 
+import { runBB84Simulation } from './protocolAnalytics.js';
+
 export const BB84_PRESET_CODE = `# ══════════════════════════════════
 # BB84 Quantum Key Distribution
 # Alice sends, Eve may intercept, Bob measures
@@ -60,77 +62,4 @@ introducing ~25% errors that Alice and Bob can detect.
 If error rate > ~11%, assume eavesdropping → abort.
 `;
 
-/**
- * Run a full BB84 simulation programmatically
- * Returns statistics about the exchange
- */
-export function runBB84Simulation(numBits = 10, eveActive = true) {
-  const bases = ['Z', 'X'];
-  const results = [];
-
-  for (let i = 0; i < numBits; i++) {
-    const aliceBasis = bases[Math.floor(Math.random() * 2)];
-    const aliceValue = Math.random() < 0.5 ? 0 : 1;
-    const bobBasis = bases[Math.floor(Math.random() * 2)];
-
-    let transmittedValue = aliceValue;
-    let eveDetected = false;
-    let eveBasis = null;
-
-    // Eve intercepts
-    if (eveActive) {
-      eveBasis = bases[Math.floor(Math.random() * 2)];
-      if (eveBasis !== aliceBasis) {
-        // Wrong basis: Eve gets random result, re-prepares incorrectly
-        transmittedValue = Math.random() < 0.5 ? 0 : 1;
-        eveDetected = true; // potentially detectable
-      }
-    }
-
-    // Bob measures
-    let bobValue;
-    if (bobBasis === aliceBasis) {
-      // Same basis as Alice: should get correct result
-      // But if Eve disturbed it, might be wrong
-      bobValue = transmittedValue;
-    } else {
-      // Different basis: random result
-      bobValue = Math.random() < 0.5 ? 0 : 1;
-    }
-
-    const basesMatch = aliceBasis === bobBasis;
-    const valueMatch = aliceValue === bobValue;
-
-    results.push({
-      bit: i,
-      aliceBasis,
-      aliceValue,
-      eveBasis: eveActive ? eveBasis : null,
-      eveIntercept: eveActive,
-      bobBasis,
-      bobValue,
-      basesMatch,
-      valueMatch,
-      error: basesMatch && !valueMatch,
-    });
-  }
-
-  const matchingBases = results.filter(r => r.basesMatch);
-  const errors = matchingBases.filter(r => r.error);
-  const errorRate = matchingBases.length > 0
-    ? ((errors.length / matchingBases.length) * 100).toFixed(1)
-    : '0.0';
-
-  const sharedKey = matchingBases
-    .filter(r => !r.error)
-    .map(r => r.aliceValue);
-
-  return {
-    results,
-    matchingBases: matchingBases.length,
-    errors: errors.length,
-    errorRate: parseFloat(errorRate),
-    sharedKey,
-    eveDetected: parseFloat(errorRate) > 11,
-  };
-}
+export { runBB84Simulation };

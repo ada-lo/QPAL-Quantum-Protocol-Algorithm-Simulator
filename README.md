@@ -1,121 +1,109 @@
-# Quantum Protocol & Algorithm Simulator
+# QPAL — Quantum Protocol & Algorithm Simulator
 
-> A GPU-accelerated, noise-aware quantum simulator with multi-party protocol visualization.  
-> Solves **Gap 2** (decoherence/noise) and **Gap 3** (scalability beyond 6 qubits via QDD).
+QPAL is an interactive quantum learning and experimentation environment focused on two things:
 
----
+- algorithm simulation with a code-first workflow
+- communication protocol visualization with Alice/Bob/Eve style actors
 
-## Research Gaps Addressed
+The project in this repository is a zero-build browser app backed by modular ES modules and a lightweight Node test suite. It is intentionally educational: the simulator uses a simplified state model so learners can see behavior, steps, and channel effects without needing a heavy backend.
 
-| Gap | Description | Implementation |
-|-----|-------------|----------------|
-| Gap 2 | No visual simulator shows realistic noise/decoherence | Qiskit Aer noise models → live Bloch sphere shrinkage + fidelity decay |
-| Gap 3 | No simulator scales beyond ~6 qubits with visual coherence | mqt-ddsim QDD backend → 20+ qubit simulation + live QDD graph |
+## What Is Implemented
 
----
-
-## Modules
-
-| Module | Status | Description |
-|--------|--------|-------------|
-| Circuit Builder | 🔲 | Drag-and-drop gate editor, 1–20 qubits |
-| Bloch Sphere | 🔲 | Three.js WebGL per-qubit state visualization |
-| Protocol Animator | 🔲 | BB84, Quantum Teleportation, Superdense Coding |
-| Algorithm Simulator | 🔲 | Grover, Shor, QAOA step-by-step |
-| Noise Dashboard | 🔲 | Gap 2 — decoherence, fidelity, noise model selector |
-| QDD Graph View | 🔲 | Gap 3 — live quantum decision diagram |
-
----
-
-## Tech Stack
-
-### Frontend
-- React 18 + Vite
-- Three.js (WebGL Bloch spheres)
-- D3.js (amplitude/phase bars, QDD graph)
-- Zustand (state management)
-- TailwindCSS
-- React Flow (circuit builder canvas)
-
-### Backend
-- Python 3.12
-- FastAPI (REST + SSE streaming)
-- cuQuantum (NVIDIA GPU state-vector sim)
-- mqt-ddsim (Quantum Decision Diagram sim — Gap 3)
-- Qiskit Aer (noise modeling — Gap 2)
-- NumPy / SciPy
-- Uvicorn + Gunicorn
-
-### Infrastructure
-- Docker + Docker Compose
-- Vercel (frontend deploy)
-- Railway / Render (backend GPU instance)
-- NVIDIA RTX 4050 (local dev)
-
----
+- Algorithm mode with Bell state, GHZ state, teleportation, superdense coding, Deutsch's algorithm, SWAP test, and custom pseudo-code circuits
+- Protocol mode with BB84, E91, teleportation flow, superdense coding flow, and custom multi-party pseudo-code
+- A pseudo-language parser for `INIT`, `H`, `X`, `CNOT`, `MEASURE`, `ACTOR`, `ASSIGN`, `SEND`, and `INTERCEPT`
+- Step-by-step execution with circuit, state, channel, and event-log views
+- Statistical security panels for BB84 and E91 with Eve toggling and shared-key/error summaries
+- Modular source files in `qpal/src/` that mirror the standalone browser app presets and analytics
+- Node-based regression tests for parsing, preset catalog integrity, and protocol analytics
 
 ## Quick Start
 
-### Prerequisites
-- Node.js 20+
-- Python 3.12+
-- CUDA 12+ (for GPU acceleration)
-- Docker (optional, for full stack)
+### Run the app
 
-### Local Development
+Open `qpal/index.html` in a modern browser.
 
-```bash
+You can also open the mirrored root copy:
 
-# 2. Start backend
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+- `qpal/index.html`
+- `qpal-index.html`
 
-# 3. Start frontend (new terminal)
-cd frontend
-npm install
-npm run dev
-# → http://localhost:5173
-```
+No build step or server is required.
 
-### Docker (Full Stack)
+### Run the tests
 
 ```bash
-docker-compose up --build
-# Frontend → http://localhost:5173
-# Backend  → http://localhost:8000
-# API docs → http://localhost:8000/docs
+npm test
 ```
 
----
+This uses Node's built-in test runner and does not require extra dependencies.
 
-## API Overview
+## Architecture
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/simulate` | POST | Run circuit simulation (state-vector or QDD) |
-| `/api/simulate/stream` | POST (SSE) | Stream step-by-step gate-by-gate results |
-| `/api/noise/simulate` | POST | Run noisy simulation with Qiskit Aer |
-| `/api/protocols/bb84` | POST | Run BB84 protocol with custom params |
-| `/api/protocols/teleportation` | POST | Quantum teleportation protocol |
-| `/api/protocols/superdense` | POST | Superdense coding protocol |
-| `/api/qdd/simulate` | POST | QDD simulation for large circuits |
-| `/api/algorithms/grover` | POST | Grover's search algorithm *(planned)* |
-| `/api/algorithms/shor` | POST | Shor's factoring *(planned)* |
-| `/api/algorithms/qaoa` | POST | QAOA optimization *(planned)* |
+```text
+User code / preset
+        ↓
+Parser
+        ↓
+ExecutionController
+        ↓
+QuantumEngine
+        ↓
+Visualization + protocol analytics
+```
 
----
+### Main layers
+
+- `qpal/src/parser/parser.js`: pseudo-language to instruction objects
+- `qpal/src/engine/engine.js`: simplified qubit, gate, actor, and channel behavior
+- `qpal/src/engine/controller.js`: run/step/reset orchestration
+- `qpal/src/presets/`: algorithm presets, protocol presets, catalogs, and analytics helpers
+- `qpal/index.html`: full standalone experience
 
 ## Project Structure
 
-```
-quantum-simulator/
-├── frontend/          # React + Vite app
-├── backend/           # FastAPI + Python
-├── docker-compose.yml
-├── .env.example
-└── README.md
+```text
+QPAL-Quantum-Protocol-Algorithm-Simulator/
+├── package.json
+├── qpal-index.html
+├── qpal/
+│   ├── index.html
+│   ├── README.md
+│   └── src/
+│       ├── engine/
+│       ├── parser/
+│       └── presets/
+└── tests/
 ```
 
-See `frontend/README.md` and `backend/README.md` for module-level docs.
+## Simulation Model
+
+QPAL currently uses a simplified instructional model rather than a full state-vector or density-matrix backend.
+
+That means it is well suited for:
+
+- classroom demos
+- concept exploration
+- protocol storytelling
+- rapid pseudo-code experiments
+
+It is not yet a mathematically exact replacement for Qiskit, Cirq, or hardware-backed simulators.
+
+## Roadmap
+
+### Near term
+
+- finish moving standalone UI logic into reusable modules
+- add more deterministic testing around protocol analytics
+- improve conditional correction handling in teleportation-style examples
+
+### Future extensions
+
+- richer gate set and basis handling
+- noise models
+- export/share features
+- optional integration with real quantum SDKs
+
+## License
+
+MIT
