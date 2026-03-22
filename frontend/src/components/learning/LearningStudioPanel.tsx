@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { ChevronLeft, ChevronRight, Expand, Pause, Play, X } from "lucide-react"
-import { LEARNING_EXPERIENCES, getLearningExperience } from "@/lib/quantum/learningCatalog"
+import { getLearningExperience } from "@/lib/quantum/learningCatalog"
 import { getLearningSceneProfile } from "@/lib/quantum/learningSceneProfiles"
 import { useLearningStore } from "@/store/learningStore"
 import { QuantumShowcase3D } from "./QuantumShowcase3D"
 
 export function LearningStudioPanel() {
   const selectedId = useLearningStore((s) => s.selectedId)
-  const loadIntoCircuit = useLearningStore((s) => s.loadIntoCircuit)
   const experience = getLearningExperience(selectedId)
   const profile = getLearningSceneProfile(experience.id)
   const [stageIndex, setStageIndex] = useState(0)
@@ -71,7 +70,6 @@ export function LearningStudioPanel() {
         setStageIndex={setStageIndex}
         playing={playing}
         setPlaying={setPlaying}
-        loadIntoCircuit={loadIntoCircuit}
         stats={stats}
         onExpand={() => setExpanded(true)}
       />
@@ -83,7 +81,7 @@ export function LearningStudioPanel() {
               position: "fixed",
               inset: 18,
               zIndex: 300,
-              background: "rgba(32, 25, 15, 0.18)",
+              background: "var(--studio-overlay)",
               backdropFilter: "blur(8px)",
               display: "grid",
               placeItems: "center",
@@ -100,8 +98,8 @@ export function LearningStudioPanel() {
               overflow: "hidden",
               borderRadius: "var(--radius-xl)",
               border: "1px solid var(--border)",
-              background: "rgba(251,248,241,0.96)",
-              boxShadow: "0 24px 60px rgba(58, 49, 35, 0.16)",
+              background: "var(--bg-panel)",
+              boxShadow: "var(--shadow-soft)",
             }}
           >
             <StudioSurface
@@ -110,7 +108,6 @@ export function LearningStudioPanel() {
               setStageIndex={setStageIndex}
               playing={playing}
               setPlaying={setPlaying}
-              loadIntoCircuit={loadIntoCircuit}
               stats={stats}
               onClose={() => setExpanded(false)}
             />
@@ -128,7 +125,6 @@ function StudioSurface({
   setStageIndex,
   playing,
   setPlaying,
-  loadIntoCircuit,
   stats,
   compact,
   onExpand,
@@ -139,7 +135,6 @@ function StudioSurface({
   setStageIndex: (value: number | ((current: number) => number)) => void
   playing: boolean
   setPlaying: (value: boolean | ((current: boolean) => boolean)) => void
-  loadIntoCircuit: (id: string) => void
   stats: { label: string; value: string; color: string }[]
   compact?: boolean
   onExpand?: () => void
@@ -149,7 +144,7 @@ function StudioSurface({
   const activeStage = profile.stages[stageIndex] ?? profile.stages[0]
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg-panel)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "linear-gradient(180deg, var(--bg-panel), var(--bg-elevated))" }}>
       <div
         style={{
           padding: compact ? "12px 14px 10px" : "16px 18px 12px",
@@ -188,41 +183,7 @@ function StudioSurface({
               <X size={14} />
             </IconButton>
           )}
-          <button
-            onClick={() => loadIntoCircuit(experience.id)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: "var(--radius-md)",
-              background: `${experience.accent}12`,
-              color: experience.accent,
-              border: `1px solid ${experience.accent}32`,
-              fontSize: 11,
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Load circuit
-          </button>
         </div>
-      </div>
-
-      <div style={{ padding: "10px 10px 8px", borderBottom: "1px solid var(--border)", display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {LEARNING_EXPERIENCES.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => loadIntoCircuit(item.id)}
-            style={{
-              padding: "4px 9px",
-              fontSize: 10,
-              borderRadius: 999,
-              border: `1px solid ${item.id === experience.id ? `${item.accent}55` : "var(--border)"}`,
-              background: item.id === experience.id ? `${item.accent}12` : "transparent",
-              color: item.id === experience.id ? item.accent : "var(--text-secondary)",
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
       </div>
 
       <div style={{ padding: compact ? "10px 12px 8px" : "12px 16px 10px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -270,7 +231,7 @@ function StudioSurface({
                 padding: compact ? "7px 8px" : "8px 10px",
                 borderRadius: "var(--radius-md)",
                 border: `1px solid ${index === stageIndex ? `${experience.accent}55` : "var(--border)"}`,
-                background: index === stageIndex ? `${experience.accent}10` : "rgba(255,255,255,0.02)",
+                background: index === stageIndex ? `${experience.accent}10` : "var(--bg-card)",
               }}
             >
               <div style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: index === stageIndex ? experience.accent : "var(--text-muted)" }}>
@@ -284,7 +245,7 @@ function StudioSurface({
         </div>
       </div>
 
-      <div style={{ height: compact ? 340 : 520, borderBottom: "1px solid var(--border)", background: "#fbf8f1" }}>
+      <div style={{ height: compact ? 340 : 520, borderBottom: "1px solid var(--border)", background: "var(--studio-canvas)" }}>
         <QuantumShowcase3D experience={experience} stageIndex={stageIndex} expanded={!compact} />
       </div>
 
@@ -303,7 +264,7 @@ function StudioSurface({
           <div style={{ fontSize: compact ? 12 : 13, lineHeight: 1.65, color: "var(--text-secondary)" }}>{activeStage.cue}</div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8 }}>
           {stats.map((stat) => (
             <StatCard key={stat.label} label={stat.label} value={stat.value} color={stat.color} />
           ))}
@@ -314,7 +275,7 @@ function StudioSurface({
             padding: compact ? "10px 12px" : "12px 14px",
             borderRadius: "var(--radius-md)",
             border: "1px solid var(--border)",
-            background: "rgba(255,255,255,0.02)",
+            background: "var(--bg-card)",
           }}
         >
           <div style={{ fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 8 }}>
@@ -331,7 +292,7 @@ function StudioSurface({
                   padding: "4px 8px",
                   borderRadius: 999,
                   border: "1px solid var(--border)",
-                  background: "rgba(255,255,255,0.02)",
+                  background: "var(--bg-card)",
                 }}
               >
                 <span style={{ width: 8, height: 8, borderRadius: "50%", background: item.color }} />
@@ -380,7 +341,7 @@ function IconButton({
         height: 34,
         borderRadius: "var(--radius-md)",
         border: "1px solid var(--border)",
-        background: "rgba(251,248,241,0.72)",
+        background: "var(--bg-card)",
         color: "var(--text-secondary)",
         display: "grid",
         placeItems: "center",

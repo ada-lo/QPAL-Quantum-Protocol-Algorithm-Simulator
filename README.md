@@ -1,121 +1,85 @@
 # Quantum Protocol & Algorithm Simulator
 
-> A GPU-accelerated, noise-aware quantum simulator with multi-party protocol visualization.  
-> Solves **Gap 2** (decoherence/noise) and **Gap 3** (scalability beyond 6 qubits via QDD).
+A React + Vite frontend and FastAPI backend for a pseudocode-first quantum protocol workspace.
 
----
+The app now centers on one integrated simulator page:
 
-## Research Gaps Addressed
+- No sidebar-driven protocol/algorithm demos
+- Editable custom pseudo language
+- Local TypeScript parser with structured JSON output
+- Backend-owned step-by-step execution state
+- Circuit timeline, Bloch inspector, docs, and benchmarks in one place
+- Light and dark themes
 
-| Gap | Description | Implementation |
-|-----|-------------|----------------|
-| Gap 2 | No visual simulator shows realistic noise/decoherence | Qiskit Aer noise models → live Bloch sphere shrinkage + fidelity decay |
-| Gap 3 | No simulator scales beyond ~6 qubits with visual coherence | mqt-ddsim QDD backend → 20+ qubit simulation + live QDD graph |
+## What Changed
 
----
-
-## Modules
-
-| Module | Status | Description |
-|--------|--------|-------------|
-| Circuit Builder | 🔲 | Drag-and-drop gate editor, 1–20 qubits |
-| Bloch Sphere | 🔲 | Three.js WebGL per-qubit state visualization |
-| Protocol Animator | 🔲 | BB84, Quantum Teleportation, Superdense Coding |
-| Algorithm Simulator | 🔲 | Grover, Shor, QAOA step-by-step |
-| Noise Dashboard | 🔲 | Gap 2 — decoherence, fidelity, noise model selector |
-| QDD Graph View | 🔲 | Gap 3 — live quantum decision diagram |
-
----
-
-## Tech Stack
-
-### Frontend
-- React 18 + Vite
-- Three.js (WebGL Bloch spheres)
-- D3.js (amplitude/phase bars, QDD graph)
-- Zustand (state management)
-- TailwindCSS
-- React Flow (circuit builder canvas)
-
-### Backend
-- Python 3.12
-- FastAPI (REST + SSE streaming)
-- cuQuantum (NVIDIA GPU state-vector sim)
-- mqt-ddsim (Quantum Decision Diagram sim — Gap 3)
-- Qiskit Aer (noise modeling — Gap 2)
-- NumPy / SciPy
-- Uvicorn + Gunicorn
-
-### Infrastructure
-- Docker + Docker Compose
-- Vercel (frontend deploy)
-- Railway / Render (backend GPU instance)
-- NVIDIA RTX 4050 (local dev)
-
----
-
-## Quick Start
-
-### Prerequisites
-- Node.js 20+
-- Python 3.12+
-- CUDA 12+ (for GPU acceleration)
-- Docker (optional, for full stack)
-
-### Local Development
-
-```bash
-
-# 2. Start backend
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-
-# 3. Start frontend (new terminal)
-cd frontend
-npm install
-npm run dev
-# → http://localhost:5173
-```
-
-### Docker (Full Stack)
-
-```bash
-docker-compose up --build
-# Frontend → http://localhost:5173
-# Backend  → http://localhost:8000
-# API docs → http://localhost:8000/docs
-```
-
----
-
-## API Overview
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/simulate` | POST | Run circuit simulation (state-vector or QDD) |
-| `/api/simulate/stream` | POST (SSE) | Stream step-by-step gate-by-gate results |
-| `/api/noise/simulate` | POST | Run noisy simulation with Qiskit Aer |
-| `/api/protocols/bb84` | POST | Run BB84 protocol with custom params |
-| `/api/protocols/teleportation` | POST | Quantum teleportation protocol |
-| `/api/protocols/superdense` | POST | Superdense coding protocol |
-| `/api/qdd/simulate` | POST | QDD simulation for large circuits |
-| `/api/algorithms/grover` | POST | Grover's search algorithm *(planned)* |
-| `/api/algorithms/shor` | POST | Shor's factoring *(planned)* |
-| `/api/algorithms/qaoa` | POST | QAOA optimization *(planned)* |
-
----
+- The old routed lesson sidebar was removed from the active app shell.
+- Protocols and algorithms are now loaded as integrated pseudocode templates.
+- The frontend parses pseudocode and immediately shows clean instruction objects.
+- The backend executes the simplified quantum and actor/transport logic.
+- The right inspector pane is resizable.
+- Bloch spheres now support zoom through OrbitControls.
+- Backend benchmarks now expose machine-aware CPU/GPU timing for GHZ, QFT, Grover, and QAOA-style workloads.
 
 ## Project Structure
 
-```
-quantum-simulator/
-├── frontend/          # React + Vite app
-├── backend/           # FastAPI + Python
-├── docker-compose.yml
-├── .env.example
-└── README.md
+```text
+frontend/
+  src/components/workspace/   integrated workspace UI
+  src/lib/workspace/          parser, API client, shared types
+backend/
+  api/routes/workspace.py     workspace endpoints
+  api/schemas/workspace.py    workspace request/response models
+  core/workspace/             catalog, executor, benchmarks
+docs/
+  WORKSPACE_GUIDE.md          syntax, architecture, and usage guide
 ```
 
-See `frontend/README.md` and `backend/README.md` for module-level docs.
+## Main Endpoints
+
+- `GET /api/workspace/catalog`
+- `POST /api/workspace/simulate`
+- `POST /api/workspace/benchmarks`
+- `GET /health`
+- Existing simulation, noise, protocol, and QDD routes are still present for the older backend features.
+
+## Run Locally
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend default: `http://localhost:5173`  
+Backend default: `http://localhost:8000`
+
+## Verification
+
+Verified during this refactor:
+
+- `frontend`: `npm run build`
+- `backend`: `python -m compileall .`
+- `backend`: `.venv\Scripts\python.exe -m pytest backend\tests\test_simulate.py backend\tests\test_noise.py backend\tests\test_workspace.py`
+
+## Documentation
+
+See `docs/WORKSPACE_GUIDE.md` for:
+
+- pseudo language syntax
+- parser behavior
+- backend execution model
+- UI architecture
+- benchmark design

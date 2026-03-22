@@ -74,6 +74,7 @@ export interface CircuitState {
   setHoveredCell: (c: { qubit: number; step: number } | null) => void
   clearCircuit: () => void
   loadPreset: (gates: Omit<CircuitGate, "id">[], nQubits: number, initialStates?: InitialStateId[]) => void
+  replaceCircuit: (gates: Omit<CircuitGate, "id">[], nQubits: number, initialStates?: InitialStateId[]) => void
   maxStep: () => number
 
   // URL sync
@@ -208,6 +209,17 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     get().pushHistory()
     set({
       nQubits, currentStep: 0, isPlaying: false, pendingConnection: null,
+      gates: gates.map(g => ({ ...g, id: crypto.randomUUID() })),
+      initialStates: initialStates ? [...initialStates] : makeInitialStates(nQubits),
+    })
+  },
+
+  replaceCircuit: (gates, nQubits, initialStates) => {
+    set({
+      nQubits,
+      currentStep: 0,
+      isPlaying: false,
+      pendingConnection: null,
       gates: gates.map(g => ({ ...g, id: crypto.randomUUID() })),
       initialStates: initialStates ? [...initialStates] : makeInitialStates(nQubits),
     })

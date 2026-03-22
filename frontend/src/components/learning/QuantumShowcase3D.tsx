@@ -6,9 +6,46 @@ import type { LearningExperience } from "@/lib/quantum/learningCatalog"
 import { getLearningSceneProfile } from "@/lib/quantum/learningSceneProfiles"
 
 type Vec3 = [number, number, number]
+type StudioPalette = {
+  canvas: string
+  fog: string
+  floor: string
+  floorRing: string
+  floorInner: string
+  stationBase: string
+  stationFace: string
+  neutral: string
+  neutralStrong: string
+  neutralSoft: string
+  gridSurface: string
+  white: string
+}
 
 function supportColor(level: LearningExperience["support"]) {
   return level === "implemented" ? "#4f7b4a" : level === "demo" ? "#9c6b24" : "#b75a45"
+}
+
+function readThemeValue(name: string, fallback: string) {
+  if (typeof window === "undefined") return fallback
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
+function getStudioPalette(): StudioPalette {
+  return {
+    canvas: readThemeValue("--studio-canvas", "#f7f1e4"),
+    fog: readThemeValue("--studio-fog", "#f7f1e4"),
+    floor: readThemeValue("--studio-floor", "#f0e7d7"),
+    floorRing: readThemeValue("--studio-floor-ring", "#d9cab0"),
+    floorInner: readThemeValue("--studio-floor-inner", "#e5d7c2"),
+    stationBase: readThemeValue("--studio-station-base", "#ebe0cf"),
+    stationFace: readThemeValue("--studio-station-face", "#f8f4ec"),
+    neutral: readThemeValue("--studio-neutral", "#c2b49c"),
+    neutralStrong: readThemeValue("--studio-neutral-strong", "#445149"),
+    neutralSoft: readThemeValue("--studio-neutral-soft", "#80867f"),
+    gridSurface: readThemeValue("--studio-grid-surface", "#f3ecde"),
+    white: readThemeValue("--studio-white", "#ffffff"),
+  }
 }
 
 function curve(points: Vec3[]) {
@@ -30,17 +67,18 @@ function tokenPoint(points: Vec3[], t: number): Vec3 {
 }
 
 function StageFloor({ accent }: { accent: string }) {
+  const palette = getStudioPalette()
   return (
     <>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.05, 0]}>
         <circleGeometry args={[3.35, 80]} />
-        <meshBasicMaterial color="#f7f2e8" />
+        <meshBasicMaterial color={palette.floor} />
       </mesh>
       <Torus args={[2.55, 0.012, 14, 120]} rotation={[Math.PI / 2, 0, 0]} position={[0, -1.04, 0]}>
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.12} transparent opacity={0.38} />
       </Torus>
       <Torus args={[1.7, 0.01, 14, 100]} rotation={[Math.PI / 2, 0, 0]} position={[0, -1.04, 0]}>
-        <meshStandardMaterial color="#d9cfbd" transparent opacity={0.5} />
+        <meshStandardMaterial color={palette.floorInner} transparent opacity={0.5} />
       </Torus>
     </>
   )
@@ -59,22 +97,27 @@ function Station({
   active: boolean
   sublabel?: string
 }) {
+  const palette = getStudioPalette()
   return (
     <group position={position}>
       <RoundedBox args={[1.18, 0.18, 0.88]} radius={0.05} position={[0, -0.12, 0]}>
-        <meshStandardMaterial color="#efe7d9" metalness={0.08} roughness={0.65} />
+        <meshStandardMaterial color={palette.stationBase} metalness={0.08} roughness={0.65} />
       </RoundedBox>
       <RoundedBox args={[0.86, 0.6, 0.07]} radius={0.04} position={[0, 0.32, -0.18]}>
-        <meshStandardMaterial color="#f8f4ec" emissive={accent} emissiveIntensity={active ? 0.18 : 0.04} />
+        <meshStandardMaterial color={palette.stationFace} emissive={accent} emissiveIntensity={active ? 0.18 : 0.04} />
       </RoundedBox>
       <RoundedBox args={[0.92, 0.05, 0.72]} radius={0.03} position={[0, 0.02, 0]}>
-        <meshStandardMaterial color={active ? accent : "#d9cfbd"} emissive={active ? accent : "#d9cfbd"} emissiveIntensity={active ? 0.12 : 0.01} />
+        <meshStandardMaterial
+          color={active ? accent : palette.neutral}
+          emissive={active ? accent : palette.neutral}
+          emissiveIntensity={active ? 0.12 : 0.01}
+        />
       </RoundedBox>
-      <Text position={[0, 0.78, 0.08]} fontSize={0.14} color={active ? accent : "#3f4b45"} anchorX="center" anchorY="middle">
+      <Text position={[0, 0.78, 0.08]} fontSize={0.14} color={active ? accent : palette.neutralStrong} anchorX="center" anchorY="middle">
         {label}
       </Text>
       {sublabel && (
-        <Text position={[0, 0.62, 0.08]} fontSize={0.08} color="#7e837b" anchorX="center" anchorY="middle">
+        <Text position={[0, 0.62, 0.08]} fontSize={0.08} color={palette.neutralSoft} anchorX="center" anchorY="middle">
           {sublabel}
         </Text>
       )}
@@ -83,13 +126,14 @@ function Station({
 }
 
 function RegisterDots({ position, accent, count }: { position: Vec3; accent: string; count: number }) {
+  const palette = getStudioPalette()
   return (
     <group position={position}>
       {Array.from({ length: count }, (_, index) => (
         <Float key={index} speed={1 + index * 0.1} rotationIntensity={0.2} floatIntensity={0.25}>
           <group position={[0, 0.12 + index * 0.18, (index - (count - 1) / 2) * 0.12]}>
             <Sphere args={[0.09, 20, 20]}>
-              <meshStandardMaterial color="#ffffff" roughness={0.12} metalness={0.1} />
+              <meshStandardMaterial color={palette.white} roughness={0.12} metalness={0.1} />
             </Sphere>
             <Sphere args={[0.03, 12, 12]} position={[0.04, 0.03, 0]}>
               <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} />
@@ -124,6 +168,7 @@ function ProbabilityBarGrid({
   dominant: [number, number]
   stageIndex: number
 }) {
+  const palette = getStudioPalette()
   const bars = useMemo(() => {
     return Array.from({ length: 4 }, (_, x) =>
       Array.from({ length: 4 }, (_, y) => {
@@ -146,8 +191,8 @@ function ProbabilityBarGrid({
             position={[(bar.x - 1.5) * 0.22, bar.height / 2 - 0.25, (bar.y - 1.5) * 0.22]}
           >
             <meshStandardMaterial
-              color={active ? accent : "#b6d1c6"}
-              emissive={active ? accent : "#b6d1c6"}
+              color={active ? accent : palette.neutral}
+              emissive={active ? accent : palette.neutral}
               emissiveIntensity={active ? 0.3 : 0.04}
             />
           </RoundedBox>
@@ -158,6 +203,7 @@ function ProbabilityBarGrid({
 }
 
 function QuantumWalkGrid({ stageIndex }: { stageIndex: number }) {
+  const palette = getStudioPalette()
   const bars = useMemo(() => {
     return Array.from({ length: 8 }, (_, x) =>
       Array.from({ length: 8 }, (_, y) => {
@@ -181,7 +227,7 @@ function QuantumWalkGrid({ stageIndex }: { stageIndex: number }) {
     <group position={[0.4, -0.2, 0.1]} rotation={[0, Math.PI / 4.6, 0]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.28, 0]}>
         <planeGeometry args={[3.2, 3.2]} />
-        <meshBasicMaterial color="#f6f0e3" />
+        <meshBasicMaterial color={palette.gridSurface} />
       </mesh>
       {bars.map((bar) => (
         <RoundedBox
@@ -193,13 +239,13 @@ function QuantumWalkGrid({ stageIndex }: { stageIndex: number }) {
           <meshStandardMaterial color={bar.color} emissive={bar.color} emissiveIntensity={0.18} />
         </RoundedBox>
       ))}
-      <Text position={[1.75, 0.1, 0]} rotation={[0, -Math.PI / 2, 0]} fontSize={0.11} color="#5f6b64">
+      <Text position={[1.75, 0.1, 0]} rotation={[0, -Math.PI / 2, 0]} fontSize={0.11} color={palette.neutralStrong}>
         X positions
       </Text>
-      <Text position={[0, 0.1, 1.75]} fontSize={0.11} color="#5f6b64">
+      <Text position={[0, 0.1, 1.75]} fontSize={0.11} color={palette.neutralStrong}>
         Y positions
       </Text>
-      <Text position={[-1.85, 1.1, -1.45]} rotation={[0, Math.PI / 2, 0]} fontSize={0.11} color="#5f6b64">
+      <Text position={[-1.85, 1.1, -1.45]} rotation={[0, Math.PI / 2, 0]} fontSize={0.11} color={palette.neutralStrong}>
         Probabilities
       </Text>
     </group>
@@ -299,6 +345,7 @@ function GroverScene({ experience, stageIndex }: { experience: LearningExperienc
 
 function OracleScene({ experience, stageIndex }: { experience: LearningExperience; stageIndex: number }) {
   const accent = experience.accent
+  const palette = getStudioPalette()
   return (
     <>
       <StageFloor accent={accent} />
@@ -307,7 +354,7 @@ function OracleScene({ experience, stageIndex }: { experience: LearningExperienc
       <Station position={[2.05, -0.05, 0.6]} label="Decision" accent={accent} active={stageIndex === 2} />
       <RegisterDots position={[-2.02, 0.14, 0.9]} accent={accent} count={3} />
       <RoundedBox args={[0.9, 0.9, 0.28]} radius={0.06} position={[0, 0.7, -0.34]}>
-        <meshStandardMaterial color="#f8f4ec" emissive={accent} emissiveIntensity={stageIndex === 1 ? 0.15 : 0.03} />
+        <meshStandardMaterial color={palette.stationFace} emissive={accent} emissiveIntensity={stageIndex === 1 ? 0.15 : 0.03} />
       </RoundedBox>
       <Text position={[0, 0.7, -0.16]} fontSize={0.16} color={accent}>
         U_f
@@ -321,6 +368,7 @@ function OracleScene({ experience, stageIndex }: { experience: LearningExperienc
 function PhaseScene({ experience, stageIndex }: { experience: LearningExperience; stageIndex: number }) {
   const accent = experience.accent
   const safe = supportColor(experience.support)
+  const palette = getStudioPalette()
   return (
     <>
       <StageFloor accent={accent} />
@@ -332,7 +380,7 @@ function PhaseScene({ experience, stageIndex }: { experience: LearningExperience
         <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.22} />
       </Torus>
       <Torus args={[0.42, 0.014, 14, 84]} rotation={[Math.PI / 2, 0, 0]} position={[0, 0.84, -0.42]}>
-        <meshStandardMaterial color="#d8cdb9" />
+        <meshStandardMaterial color={palette.neutral} />
       </Torus>
       <MovingToken path={[[-1.55, 0.42, 0.14], [0, 0.92, -0.46], [1.55, 0.42, 0.14]]} accent={accent} t={stageIndex / 2} />
       <group position={[2.05, 0.28, 0.78]}>
@@ -385,6 +433,7 @@ function VariationalScene({ experience, stageIndex }: { experience: LearningExpe
 }
 
 function WalkScene({ experience, stageIndex }: { experience: LearningExperience; stageIndex: number }) {
+  const palette = getStudioPalette()
   return (
     <>
       <StageFloor accent={experience.accent} />
@@ -392,7 +441,7 @@ function WalkScene({ experience, stageIndex }: { experience: LearningExperience;
       <Text position={[0.1, 1.72, 0]} fontSize={0.18} color={experience.accent} anchorX="center" anchorY="middle">
         Controlled alternating quantum walk
       </Text>
-      <Text position={[0.1, 1.48, 0]} fontSize={0.1} color="#5f6b64" anchorX="center" anchorY="middle">
+      <Text position={[0.1, 1.48, 0]} fontSize={0.1} color={palette.neutralStrong} anchorX="center" anchorY="middle">
         Structured probability landscape across positions
       </Text>
     </>
@@ -418,16 +467,18 @@ export function QuantumShowcase3D({
   stageIndex: number
   expanded?: boolean
 }) {
+  const themeKey = typeof document !== "undefined" ? document.documentElement.dataset.theme ?? "light" : "light"
+  const palette = useMemo(() => getStudioPalette(), [themeKey])
   const camera = experience.id === "qwalk"
     ? { position: [4.4, 3.8, 5.8] as Vec3, fov: expanded ? 36 : 42 }
     : { position: [0, 1.5, 5.6] as Vec3, fov: expanded ? 32 : 38 }
 
   return (
     <Canvas camera={camera}>
-      <color attach="background" args={["#fbf8f1"]} />
-      <fog attach="fog" args={["#fbf8f1", 4.2, 9]} />
+      <color attach="background" args={[palette.canvas]} />
+      <fog attach="fog" args={[palette.fog, 4.2, 9]} />
       <ambientLight intensity={0.95} />
-      <directionalLight position={[4, 5, 3]} intensity={1.15} color="#ffffff" />
+      <directionalLight position={[4, 5, 3]} intensity={1.15} color={palette.white} />
       <pointLight position={[-2, 2, 4]} intensity={0.7} color={experience.accent} />
       <SceneContent experience={experience} stageIndex={stageIndex} />
       <OrbitControls

@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class WorkspaceInstruction(BaseModel):
+    line: int = Field(..., ge=1)
+    raw: str
+    opcode: str
+    args: list[str] = Field(default_factory=list)
+    qubits: list[str] = Field(default_factory=list)
+    actors: list[str] = Field(default_factory=list)
+    basis: Literal["X", "Z"] | None = None
+    label: str | None = None
+    category: Literal["quantum", "transport", "actor", "annotation", "macro"] = "quantum"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkspaceSimulateRequest(BaseModel):
+    instructions: list[WorkspaceInstruction] = Field(default_factory=list)
+    seed: int | None = None
+
+
+class MeasurementRecord(BaseModel):
+    qubit: str
+    basis: Literal["X", "Z"]
+    value: int
+    actor: str | None = None
+    step: int
+
+
+class TransmissionRecord(BaseModel):
+    qubit: str
+    from_actor: str | None = None
+    to_actor: str | None = None
+    status: Literal["sent", "intercepted", "received"]
+    intercepted_by: str | None = None
+    step: int
+
+
+class WorkspaceBlochVector(BaseModel):
+    qubit: str
+    x: float
+    y: float
+    z: float
+
+
+class WorkspaceQubitState(BaseModel):
+    id: str
+    initialized: bool
+    state_label: str
+    superposition: bool
+    owner: str | None = None
+    location: str | None = None
+    entangled_with: list[str] = Field(default_factory=list)
+    intercepted_by: str | None = None
+    last_operation: str | None = None
+
+
+class WorkspaceActorState(BaseModel):
+    name: str
+    owned_qubits: list[str] = Field(default_factory=list)
+
+
+class WorkspaceExecutionState(BaseModel):
+    qubits: list[WorkspaceQubitState] = Field(default_factory=list)
+    actors: list[WorkspaceActorState] = Field(default_factory=list)
+    bloch_vectors: list[WorkspaceBlochVector] = Field(default_factory=list)
+    measurements: list[MeasurementRecord] = Field(default_factory=list)
+    transmissions: list[TransmissionRecord] = Field(default_factory=list)
+
+
+class WorkspaceExecutionStep(BaseModel):
+    index: int
+    instruction: WorkspaceInstruction
+    event: str
+    state: WorkspaceExecutionState
+
+
+class WorkspaceSummary(BaseModel):
+    qubits: list[str] = Field(default_factory=list)
+    actors: list[str] = Field(default_factory=list)
+    total_steps: int = 0
+    measurements: int = 0
+
+
+class WorkspaceSimulateResponse(BaseModel):
+    engine: str = "simplified-workspace-backend"
+    summary: WorkspaceSummary
+    steps: list[WorkspaceExecutionStep] = Field(default_factory=list)
+    final_state: WorkspaceExecutionState
+    measurement_results: list[MeasurementRecord] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class WorkspaceSyntaxItem(BaseModel):
+    syntax: str
+    description: str
+    category: str
+    example: str | None = None
+    expands_to: list[str] | None = None
+
+
+class WorkspaceTemplate(BaseModel):
+    id: str
+    title: str
+    kind: Literal["protocol", "algorithm", "circuit", "benchmark"]
+    description: str
+    tags: list[str] = Field(default_factory=list)
+    code: str
+
+
+class WorkspaceBenchmarkProfile(BaseModel):
+    id: str
+    label: str
+    description: str
+    qubits: int
+    family: str
+
+
+class WorkspaceCatalogResponse(BaseModel):
+    syntax: list[WorkspaceSyntaxItem] = Field(default_factory=list)
+    templates: list[WorkspaceTemplate] = Field(default_factory=list)
+    benchmarks: list[WorkspaceBenchmarkProfile] = Field(default_factory=list)
+    architecture_notes: list[str] = Field(default_factory=list)
+
+
+class WorkspaceBenchmarkRequest(BaseModel):
+    benchmark_ids: list[str] | None = None
+    repetitions: int = Field(default=1, ge=1, le=5)
+    prefer_gpu: bool = True
+
+
+class WorkspaceSystemCapabilities(BaseModel):
+    cpu: str
+    cpu_cores: int
+    gpu_available: bool
+    gpu_name: str | None = None
+    gpu_memory: str | None = None
+    gpu_driver: str | None = None
+
+
+class WorkspaceBenchmarkResult(BaseModel):
+    id: str
+    label: str
+    family: str
+    qubits: int
+    depth: int
+    gate_count: int
+    duration_ms: float
+    engine_used: str
+    gpu_used: bool
+    notes: str | None = None
+
+
+class WorkspaceBenchmarkResponse(BaseModel):
+    capabilities: WorkspaceSystemCapabilities
+    results: list[WorkspaceBenchmarkResult] = Field(default_factory=list)
+    used_gpu: bool = False
+    reference_note: str
