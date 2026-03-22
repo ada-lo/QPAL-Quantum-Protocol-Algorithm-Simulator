@@ -3,6 +3,8 @@ import { useState } from "react"
 import { BB84Animator } from "./BB84Animator"
 import { TeleportAnimator } from "./TeleportAnimator"
 import { SuperdenseAnimator } from "./SuperdenseAnimator"
+import { E91Animator } from "./E91Animator"
+import { ProtocolComparison } from "./ProtocolComparison"
 
 interface Protocol {
   id: string
@@ -22,6 +24,12 @@ const PROTOCOLS: Protocol[] = [
     desc: "Generate a shared secret key using quantum mechanics. An eavesdropper introduces detectable errors.",
   },
   {
+    id: "e91", label: "E91 QKD", subtitle: "Entanglement-Based Key Distribution",
+    tag: "cryptography", tagColor: "var(--accent-purple)",
+    icon: "🔗",
+    desc: "Distribute keys using entangled pairs. Security proven by Bell inequality violation.",
+  },
+  {
     id: "teleport", label: "Teleportation", subtitle: "Quantum State Transfer",
     tag: "entanglement", tagColor: "var(--accent-purple)",
     icon: "✦",
@@ -32,6 +40,12 @@ const PROTOCOLS: Protocol[] = [
     tag: "communication", tagColor: "var(--accent-amber)",
     icon: "⇌",
     desc: "Send two classical bits by transmitting a single qubit, exploiting pre-shared entanglement.",
+  },
+  {
+    id: "compare", label: "Compare", subtitle: "Protocol Comparison",
+    tag: "reference", tagColor: "var(--accent-green)",
+    icon: "⚖",
+    desc: "Side-by-side comparison of BB84, E91, and Superdense across key dimensions.",
   },
 ]
 
@@ -91,8 +105,10 @@ export function ProtocolAnimator() {
       {/* ── Main content ── */}
       <div style={{ flex: 1, overflow: "auto" }}>
         {active === "bb84"       && <BB84Animator />}
+        {active === "e91"        && <E91Animator />}
         {active === "teleport"   && <TeleportAnimator />}
         {active === "superdense" && <SuperdenseAnimator />}
+        {active === "compare"    && <ProtocolComparison />}
       </div>
     </div>
   )
