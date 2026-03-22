@@ -60,27 +60,39 @@ const ALGORITHMS = [
 export function Algorithms() {
   const [algo, setAlgo] = useState("grover")
   return (
-    <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      {/* Sidebar */}
+    <div style={{ display: "flex", height: "100%", overflow: "hidden", padding: 18, gap: 16 }}>
       <div style={{
-        width: 200, flexShrink: 0, borderRight: "1px solid var(--border)",
+        width: 248, flexShrink: 0,
         display: "flex", flexDirection: "column",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        background: "rgba(251,248,241,0.84)",
+        overflow: "hidden",
       }}>
         <div style={{
-          fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)",
-          padding: "10px 14px 8px", borderBottom: "1px solid var(--border)",
-        }}>ALGORITHMS</div>
-        <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+          padding: "14px 16px 12px", borderBottom: "1px solid var(--border)",
+        }}>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
+            ALGORITHM LESSONS
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
+            Search, phase, oracle, and variational methods
+          </div>
+          <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)" }}>
+            Choose a lesson, then study how the routine moves from preparation to measurement.
+          </div>
+        </div>
+        <div style={{ padding: "10px", display: "flex", flexDirection: "column", gap: 6, overflow: "auto" }}>
           {ALGORITHMS.map(a => (
             <button key={a.id} onClick={() => setAlgo(a.id)} style={{
-              textAlign: "left", padding: "9px 12px",
+              textAlign: "left", padding: "12px 12px",
               borderRadius: "var(--radius-md)", transition: "all var(--transition)",
-              background: algo === a.id ? "var(--bg-hover)" : "transparent",
-              border: `1px solid ${algo === a.id ? a.tagColor : "transparent"}`,
+              background: algo === a.id ? `${a.tagColor}10` : "rgba(255,255,255,0.02)",
+              border: `1px solid ${algo === a.id ? `${a.tagColor}30` : "var(--border)"}`,
               cursor: "pointer",
             }}>
               <div style={{
-                fontSize: 12, fontWeight: algo === a.id ? 700 : 400,
+                fontSize: 12, fontWeight: 700,
                 color: algo === a.id ? a.tagColor : "var(--text-primary)",
                 marginBottom: 4,
               }}>{a.label}</div>
@@ -95,8 +107,12 @@ export function Algorithms() {
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflow: "auto" }}>
+      <div style={{
+        flex: 1, overflow: "auto",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        background: "rgba(251,248,241,0.76)",
+      }}>
         {algo === "grover" && <GroverExplorer />}
         {algo === "shor"   && <ShorExplorer />}
         {algo === "qft"    && <QFTExplorer />}

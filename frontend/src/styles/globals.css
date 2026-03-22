@@ -1,21 +1,52 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-@import './theme.css';
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap");
+@import "./theme.css";
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 html, body, #root {
   height: 100%;
-  background: var(--bg-primary);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.55), transparent 28%),
+    linear-gradient(180deg, #f6f2ea 0%, #efe7d9 100%);
   color: var(--text-primary);
   font-family: var(--font-display);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-secondary); }
-::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+body {
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(45, 106, 90, 0.18);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 107, 84, 0.28);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
 
 button {
   cursor: pointer;
@@ -25,20 +56,25 @@ button {
   color: inherit;
 }
 
-input, select {
+input, select, textarea {
   font-family: inherit;
-  background: var(--bg-secondary);
+  background: var(--bg-panel);
   border: 1px solid var(--border);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  padding: 4px 8px;
+  padding: 8px 10px;
 }
 
-input:focus, select:focus {
+input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px rgba(45, 106, 90, 0.08);
 }
 
-.mono { font-family: var(--font-mono); }
-.glow-cyan { text-shadow: 0 0 10px var(--accent-cyan); }
-.glow-purple { text-shadow: 0 0 10px var(--accent-purple); }
+.mono {
+  font-family: var(--font-mono);
+}
+
+.glow-cyan, .glow-purple {
+  text-shadow: none;
+}

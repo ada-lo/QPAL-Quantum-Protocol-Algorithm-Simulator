@@ -1,47 +1,50 @@
 :root {
-  --bg-primary: #080c14;
-  --bg-secondary: #0d1421;
-  --bg-panel: #111827;
-  --bg-card: #141e2e;
-  --bg-hover: #1a2540;
+  --bg-primary: #f3efe6;
+  --bg-secondary: #ebe4d7;
+  --bg-panel: #fbf8f1;
+  --bg-card: #f7f2e8;
+  --bg-hover: #ece3d3;
 
-  --border: #1e2d45;
-  --border-bright: #2a3f60;
+  --border: #d8cdb9;
+  --border-bright: #b7a88f;
 
-  --text-primary: #e8f0fe;
-  --text-secondary: #8ba3c7;
-  --text-muted: #4a6080;
+  --text-primary: #1f2a26;
+  --text-secondary: #5f6b64;
+  --text-muted: #8a8b7f;
 
-  --accent-cyan: #00d4ff;
-  --accent-blue: #3b82f6;
-  --accent-purple: #8b5cf6;
-  --accent-green: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-red: #ef4444;
-  --accent-pink: #ec4899;
+  --accent-cyan: #2d6a5a;
+  --accent-blue: #456f9a;
+  --accent-purple: #7567a8;
+  --accent-green: #4f7b4a;
+  --accent-amber: #9c6b24;
+  --accent-red: #b75a45;
+  --accent-pink: #ad5d7d;
 
-  --gate-h: #8b5cf6;
-  --gate-x: #ef4444;
-  --gate-y: #f59e0b;
-  --gate-z: #3b82f6;
-  --gate-cnot: #10b981;
-  --gate-t: #ec4899;
-  --gate-s: #00d4ff;
-  --gate-measure: #6b7280;
+  --gate-h: #7567a8;
+  --gate-x: #b75a45;
+  --gate-y: #9c6b24;
+  --gate-z: #456f9a;
+  --gate-cnot: #4f7b4a;
+  --gate-t: #ad5d7d;
+  --gate-s: #2d6a5a;
+  --gate-measure: #7b7d74;
 
-  --noise-high: #ef4444;
-  --noise-mid: #f59e0b;
-  --noise-low: #10b981;
+  --noise-high: #b75a45;
+  --noise-mid: #9c6b24;
+  --noise-low: #4f7b4a;
 
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
+  --font-display: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-serif: "Newsreader", Georgia, serif;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 
-  --shadow-glow-cyan: 0 0 20px rgba(0, 212, 255, 0.15);
-  --shadow-glow-purple: 0 0 20px rgba(139, 92, 246, 0.15);
-  --transition: 0.15s ease;
+  --shadow-soft: 0 14px 42px rgba(58, 49, 35, 0.08);
+  --shadow-card: 0 8px 24px rgba(70, 58, 37, 0.06);
+  --shadow-glow-cyan: 0 0 0 rgba(0, 0, 0, 0);
+  --shadow-glow-purple: 0 0 0 rgba(0, 0, 0, 0);
+  --transition: 0.18s ease;
 }

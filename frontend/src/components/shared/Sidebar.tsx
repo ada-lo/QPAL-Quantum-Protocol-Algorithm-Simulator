@@ -1,40 +1,152 @@
 import { NavLink } from "react-router-dom"
-import { Cpu, FlaskConical, Workflow, BookOpen } from "lucide-react"
+import { BookOpen, Cpu, FlaskConical, Workflow } from "lucide-react"
 
 const NAV = [
-  { to: "/",           icon: BookOpen,    label: "Home" },
-  { to: "/simulator",  icon: Cpu,         label: "Circuit" },
-  { to: "/protocols",  icon: Workflow,    label: "Protocols" },
-  { to: "/algorithms", icon: FlaskConical,label: "Algorithms" },
+  {
+    to: "/",
+    icon: BookOpen,
+    label: "Overview",
+    blurb: "Start here for the simplest route into the simulator",
+  },
+  {
+    to: "/simulator",
+    icon: Cpu,
+    label: "Circuit Studio",
+    blurb: "Build circuits, inspect states, and compare visual views",
+  },
+  {
+    to: "/protocols",
+    icon: Workflow,
+    label: "Protocols",
+    blurb: "Study BB84, teleportation, superdense coding, and more",
+  },
+  {
+    to: "/algorithms",
+    icon: FlaskConical,
+    label: "Algorithms",
+    blurb: "Explore search, phase, variational, and walk-based methods",
+  },
 ]
 
 export function Sidebar() {
   return (
-    <nav style={{
-      width: 56, background: "var(--bg-secondary)",
-      borderRight: "1px solid var(--border)",
-      display: "flex", flexDirection: "column", alignItems: "center",
-      padding: "16px 0", gap: 4, flexShrink: 0,
-    }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: "var(--radius-md)",
-        background: "var(--accent-cyan)", display: "flex",
-        alignItems: "center", justifyContent: "center",
-        marginBottom: 16, flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 16, filter: "brightness(0)" }}>⟨ψ⟩</span>
+    <aside
+      style={{
+        width: 264,
+        background: "rgba(251, 248, 241, 0.82)",
+        border: "1px solid rgba(216, 205, 185, 0.9)",
+        borderRadius: "var(--radius-xl)",
+        padding: 18,
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+        boxShadow: "var(--shadow-soft)",
+        backdropFilter: "blur(14px)",
+        flexShrink: 0,
+        minHeight: 0,
+      }}
+    >
+      <div
+        style={{
+          padding: "6px 4px 12px",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 12,
+            background: "var(--accent-cyan)",
+            display: "grid",
+            placeItems: "center",
+            color: "#f7f2e8",
+            fontFamily: "var(--font-serif)",
+            fontSize: 18,
+            marginBottom: 12,
+          }}
+        >
+          q
+        </div>
+        <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-muted)", marginBottom: 6 }}>
+          QUANTUM LEARNING WORKSPACE
+        </div>
+        <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.2, color: "var(--text-primary)" }}>
+          Protocol and algorithm intuition,
+          <br />
+          without the clutter.
+        </div>
       </div>
-      {NAV.map(({ to, icon: Icon, label }) => (
-        <NavLink key={to} to={to} title={label} style={({ isActive }) => ({
-          width: 40, height: 40, borderRadius: "var(--radius-md)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: isActive ? "var(--accent-cyan)" : "var(--text-muted)",
-          background: isActive ? "var(--bg-hover)" : "transparent",
-          textDecoration: "none", transition: "all var(--transition)",
-        })}>
-          <Icon size={18} />
-        </NavLink>
-      ))}
-    </nav>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
+        {NAV.map(({ to, icon: Icon, label, blurb }) => (
+          <NavLink
+            key={to}
+            to={to}
+            style={({ isActive }) => ({
+              display: "grid",
+              gridTemplateColumns: "36px 1fr",
+              gap: 12,
+              alignItems: "start",
+              padding: "12px 12px 12px 10px",
+              borderRadius: "var(--radius-md)",
+              textDecoration: "none",
+              border: `1px solid ${isActive ? "rgba(45, 106, 90, 0.28)" : "transparent"}`,
+              background: isActive ? "rgba(45, 106, 90, 0.08)" : "transparent",
+              transition: "all var(--transition)",
+            })}
+          >
+            {({ isActive }) => (
+              <>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 11,
+                    display: "grid",
+                    placeItems: "center",
+                    background: isActive ? "var(--accent-cyan)" : "var(--bg-card)",
+                    color: isActive ? "#f8f3eb" : "var(--text-secondary)",
+                    border: `1px solid ${isActive ? "var(--accent-cyan)" : "var(--border)"}`,
+                  }}
+                >
+                  <Icon size={17} />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: isActive ? "var(--accent-cyan)" : "var(--text-primary)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {label}
+                  </div>
+                  <div style={{ fontSize: 11, lineHeight: 1.45, color: "var(--text-secondary)" }}>{blurb}</div>
+                </div>
+              </>
+            )}
+          </NavLink>
+        ))}
+      </div>
+
+      <div
+        style={{
+          marginTop: "auto",
+          padding: 14,
+          borderRadius: "var(--radius-md)",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-muted)", marginBottom: 6 }}>
+          QUICK INTENT
+        </div>
+        <div style={{ fontSize: 12, lineHeight: 1.55, color: "var(--text-secondary)" }}>
+          Choose an experience, load the circuit, then use the visual tabs to connect the gates with the idea behind them.
+        </div>
+      </div>
+    </aside>
   )
 }

@@ -1,106 +1,123 @@
-import { CircuitBuilder } from "@/components/circuit/CircuitBuilder"
+import { useMemo } from "react"
 import { BlochSphere } from "@/components/bloch/BlochSphere"
+import { CircuitBuilder } from "@/components/circuit/CircuitBuilder"
+import { CircuitPseudocodePanel } from "@/components/circuit/CircuitPseudocodePanel"
+import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
 import { NoiseDashboard } from "@/components/noise/NoiseDashboard"
 import { QDDGraphView } from "@/components/qdd/QDDGraphView"
-import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
 import { TabPanel } from "@/components/shared/TabPanel"
+import { formatBasisState } from "@/lib/quantum/stateVector"
 import { useCircuitStore } from "@/store/circuitStore"
 import { useSimStore } from "@/store/simStore"
-import { formatBasisState } from "@/lib/quantum/stateVector"
-import { useMemo } from "react"
 
 function OutputPanel() {
-  const result = useSimStore(s => s.result)
-  const nQubits = useCircuitStore(s => s.nQubits)
+  const result = useSimStore((s) => s.result)
+  const nQubits = useCircuitStore((s) => s.nQubits)
 
   const stateRows = useMemo(() => {
     if (!result?.stateVector) return []
     return result.stateVector
       .map((c: any, i: number) => ({
         basis: formatBasisState(i, nQubits),
-        re: c.re, im: c.im,
         prob: c.re * c.re + c.im * c.im,
-        phase: Math.atan2(c.im, c.re),
       }))
-      .filter((r: any) => r.prob > 0.0001)
+      .filter((row: any) => row.prob > 0.0001)
       .sort((a: any, b: any) => b.prob - a.prob)
-      .slice(0, 32)
+      .slice(0, 24)
   }, [result, nQubits])
 
-  if (!result) return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center",
-      height: "100%", color: "var(--text-muted)", fontFamily: "var(--font-mono)",
-      fontSize: 11,
-    }}>
-      Place gates to see output
-    </div>
-  )
+  if (!result) {
+    return (
+      <div
+        style={{
+          display: "grid",
+          placeItems: "center",
+          height: "100%",
+          color: "var(--text-muted)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+        }}
+      >
+        Load a lesson or place gates to inspect the state.
+      </div>
+    )
+  }
 
   return (
-    <div style={{ padding: "10px 12px", overflow: "auto", height: "100%" }}>
-      <div style={{
-        fontSize: 9, color: "var(--text-muted)", fontFamily: "var(--font-mono)",
-        marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em",
-      }}>
-        State Vector ({stateRows.length} non-zero)
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        {stateRows.map((r: any) => (
-          <div key={r.basis} style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "4px 8px", borderRadius: 4,
-            background: r.prob > 0.5 ? "rgba(0,212,255,0.05)" : "transparent",
-          }}>
-            <span style={{
-              fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 600,
-              color: "var(--accent-cyan)", minWidth: 52,
-            }}>{r.basis}</span>
-            <div style={{
-              flex: 1, height: 8, background: "var(--bg-hover)", borderRadius: 2,
-              overflow: "hidden",
-            }}>
-              <div style={{
-                width: `${r.prob * 100}%`, height: "100%",
-                background: r.prob > 0.5 ? "var(--accent-cyan)" : "var(--accent-blue)",
-                borderRadius: 2, transition: "width 0.3s ease",
-              }} />
-            </div>
-            <span style={{
-              fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-secondary)",
-              minWidth: 40, textAlign: "right",
-            }}>{(r.prob * 100).toFixed(1)}%</span>
+    <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>STATE VECTOR SNAPSHOT</div>
+      {stateRows.map((row: any) => (
+        <div
+          key={row.basis}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "58px 1fr 46px",
+            gap: 10,
+            alignItems: "center",
+            padding: "8px 10px",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border)",
+            background: "rgba(255,255,255,0.02)",
+          }}
+        >
+          <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>{row.basis}</span>
+          <div style={{ height: 8, borderRadius: 999, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
+            <div style={{ width: `${row.prob * 100}%`, height: "100%", background: "var(--accent-cyan)" }} />
           </div>
-        ))}
-      </div>
+          <span style={{ fontSize: 10, textAlign: "right", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+            {(row.prob * 100).toFixed(1)}%
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
 
 export function Simulator() {
-  const nQubits = useCircuitStore(s => s.nQubits)
+  const nQubits = useCircuitStore((s) => s.nQubits)
+
   return (
-    <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      {/* Left — circuit builder, flexible width */}
-      <div style={{
-        flex: "1 1 0", minWidth: 0,
-        borderRight: "1px solid var(--border)",
-        overflow: "hidden", display: "flex", flexDirection: "column",
-      }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1.35fr) minmax(360px, 0.9fr)",
+        height: "100%",
+        gap: 0,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          minWidth: 0,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          borderRight: "1px solid var(--border)",
+          background: "rgba(251,248,241,0.46)",
+        }}
+      >
         <CircuitBuilder />
       </div>
-      {/* Right — visualization panel */}
-      <div style={{
-        width: 320, flexShrink: 0,
-        display: "flex", flexDirection: "column", overflow: "hidden",
-      }}>
-        <TabPanel tabs={[
-          { id: "output", label: "Output", content: <OutputPanel /> },
-          { id: "studio", label: "Studio 3D", content: <LearningStudioPanel /> },
-          { id: "bloch",  label: "Bloch",  content: <BlochSphere /> },
-          { id: "noise",  label: "Noise",  content: <NoiseDashboard /> },
-          ...(nQubits > 6 ? [{ id: "qdd", label: "QDD ⬡", content: <QDDGraphView /> }] : []),
-        ]} />
+
+      <div
+        style={{
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          background: "rgba(251,248,241,0.58)",
+        }}
+      >
+        <TabPanel
+          tabs={[
+            { id: "studio", label: "Studio", content: <LearningStudioPanel /> },
+            { id: "pseudocode", label: "Pseudocode", content: <CircuitPseudocodePanel /> },
+            { id: "output", label: "Output", content: <OutputPanel /> },
+            { id: "bloch", label: "Bloch", content: <BlochSphere /> },
+            { id: "noise", label: "Noise", content: <NoiseDashboard /> },
+            ...(nQubits > 6 ? [{ id: "qdd", label: "QDD", content: <QDDGraphView /> }] : []),
+          ]}
+        />
       </div>
     </div>
   )
