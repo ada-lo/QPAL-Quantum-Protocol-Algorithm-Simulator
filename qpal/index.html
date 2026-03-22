@@ -1288,6 +1288,146 @@ ASSIGN q2 Alice
 SEND q2 Alice Bob
 MEASURE q2 BASIS Z`;
 
+const GHZ_STATE_CODE = `# ══════════════════════════════════
+# GHZ State: (|000⟩ + |111⟩) / √2
+# Greenberger–Horne–Zeilinger
+# ══════════════════════════════════
+
+# Initialize three qubits
+INIT q0
+INIT q1
+INIT q2
+
+# Hadamard on q0 → superposition
+H q0
+
+# Cascade CNOT to entangle all three
+CNOT q0 q1
+CNOT q0 q2
+
+# Measure all — they always agree
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z`;
+
+const TELEPORT_ALGO_CODE = `# ══════════════════════════════════
+# Quantum Teleportation (Circuit)
+# Transfer |ψ⟩ from q0 → q2
+# ══════════════════════════════════
+
+# Prepare the qubit to teleport
+INIT q0
+X q0
+# q0 is now |1⟩ — the state to teleport
+
+# Create Bell pair between q1 and q2
+INIT q1
+INIT q2
+H q1
+CNOT q1 q2
+
+# Bell measurement on q0, q1
+CNOT q0 q1
+H q0
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+
+# Correction gates on q2
+# (In a real circuit these are conditional)
+X q2
+
+# Verify teleported state
+MEASURE q2 BASIS Z`;
+
+const SUPERDENSE_CODE = `# ══════════════════════════════════
+# Superdense Coding (Circuit)
+# Send 2 classical bits via 1 qubit
+# ══════════════════════════════════
+
+# Create entangled Bell pair
+INIT q0
+INIT q1
+H q0
+CNOT q0 q1
+
+# Encode 2 classical bits on q0
+# Encoding "11" → apply X then Z (X here)
+X q0
+# For bit-flip + phase: apply X and H
+# Other encodings:
+#   00 = I (do nothing)
+#   01 = X
+#   10 = H (phase via Hadamard proxy)
+#   11 = X then H
+
+# Decode: reverse the Bell circuit
+CNOT q0 q1
+H q0
+
+# Measure to retrieve encoded bits
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z`;
+
+const DEUTSCH_CODE = `# ══════════════════════════════════
+# Deutsch's Algorithm
+# Determines if f is constant or balanced
+# using only ONE function evaluation
+# ══════════════════════════════════
+
+# Initialize input and output qubits
+INIT q0
+INIT q1
+
+# Prepare output qubit in |1⟩
+X q1
+
+# Apply Hadamard to both
+H q0
+H q1
+
+# Oracle: CNOT acts as balanced f(x) = x
+CNOT q0 q1
+
+# Apply Hadamard to input
+H q0
+
+# Measure input qubit
+# |0⟩ → f is constant, |1⟩ → f is balanced
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z`;
+
+const SWAP_TEST_CODE = `# ══════════════════════════════════
+# SWAP Test
+# Tests equality of two quantum states
+# ══════════════════════════════════
+
+# Ancilla qubit
+INIT q0
+# State A
+INIT q1
+# State B
+INIT q2
+
+# Prepare identical states for testing
+H q1
+H q2
+
+# Hadamard on ancilla
+H q0
+
+# Controlled-SWAP via CNOT decomposition
+CNOT q1 q2
+CNOT q0 q1
+CNOT q1 q2
+
+# Hadamard on ancilla
+H q0
+
+# Measure ancilla: |0⟩ = states are equal
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z`;
+
 const CUSTOM_ALGO_CODE = `# Custom Algorithm
 # Write your quantum circuit below
 
@@ -1297,6 +1437,116 @@ H q0
 CNOT q0 q1
 MEASURE q0 BASIS Z
 MEASURE q1 BASIS Z`;
+
+const TELEPORT_PROTO_CODE = `# ══════════════════════════════════
+# Quantum Teleportation Protocol
+# Alice teleports |ψ⟩ to Bob
+# ══════════════════════════════════
+
+# Declare actors
+ACTOR Alice
+ACTOR Bob
+
+# Alice prepares the qubit to teleport
+INIT q0
+X q0
+ASSIGN q0 Alice
+
+# Shared Bell pair
+INIT q1
+INIT q2
+H q1
+CNOT q1 q2
+ASSIGN q1 Alice
+ASSIGN q2 Bob
+
+# Alice performs Bell measurement
+CNOT q0 q1
+H q0
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+
+# Alice sends classical results to Bob
+SEND q0 Alice Bob
+SEND q1 Alice Bob
+
+# Bob applies corrections and measures
+X q2
+MEASURE q2 BASIS Z`;
+
+const SUPERDENSE_PROTO_CODE = `# ══════════════════════════════════
+# Superdense Coding Protocol
+# Alice sends 2 bits to Bob via 1 qubit
+# ══════════════════════════════════
+
+# Declare actors
+ACTOR Alice
+ACTOR Bob
+
+# Shared entangled pair
+INIT q0
+INIT q1
+H q0
+CNOT q0 q1
+ASSIGN q0 Alice
+ASSIGN q1 Bob
+
+# Alice encodes two classical bits
+# Encoding "01" → apply X gate
+X q0
+
+# Alice sends her qubit to Bob
+SEND q0 Alice Bob
+
+# Bob decodes
+CNOT q0 q1
+H q0
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z`;
+
+const E91_PROTO_CODE = `# ══════════════════════════════════
+# E91 Protocol (Ekert 1991)
+# Entanglement-based QKD
+# ══════════════════════════════════
+
+# Declare actors
+ACTOR Alice
+ACTOR Bob
+ACTOR Eve
+
+# Source creates entangled pairs
+# Pair 1
+INIT q0
+INIT q1
+H q0
+CNOT q0 q1
+ASSIGN q0 Alice
+ASSIGN q1 Bob
+
+# Pair 2
+INIT q2
+INIT q3
+H q2
+CNOT q2 q3
+ASSIGN q2 Alice
+ASSIGN q3 Bob
+
+# Pair 3 — Eve intercepts this one
+INIT q4
+INIT q5
+H q4
+CNOT q4 q5
+ASSIGN q4 Alice
+ASSIGN q5 Bob
+INTERCEPT q5 Eve
+
+# Alice and Bob measure in random bases
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS X
+MEASURE q3 BASIS X
+MEASURE q4 BASIS Z
+MEASURE q5 BASIS X`;
 
 const CUSTOM_PROTO_CODE = `# Custom Protocol
 # Declare actors and write protocol logic
@@ -1312,11 +1562,19 @@ MEASURE q0 BASIS Z`;
 
 const ALGO_PRESETS = [
   { id:'bell', icon:'🔔', label:'Bell State', desc:'|Φ+⟩ entangled pair', code:BELL_STATE_CODE },
+  { id:'ghz', icon:'🌐', label:'GHZ State', desc:'3-qubit entanglement', code:GHZ_STATE_CODE },
+  { id:'teleport-algo', icon:'🚀', label:'Teleportation', desc:'Transfer qubit state', code:TELEPORT_ALGO_CODE },
+  { id:'superdense', icon:'📦', label:'Superdense Coding', desc:'2 bits via 1 qubit', code:SUPERDENSE_CODE },
+  { id:'deutsch', icon:'🔮', label:"Deutsch's Algorithm", desc:'Constant vs balanced', code:DEUTSCH_CODE },
+  { id:'swap-test', icon:'🔄', label:'SWAP Test', desc:'Test state equality', code:SWAP_TEST_CODE },
   { id:'custom-algo', icon:'✏️', label:'Custom Algorithm', desc:'Write your own', code:CUSTOM_ALGO_CODE },
 ];
 
 const PROTO_PRESETS = [
   { id:'bb84', icon:'🔐', label:'BB84 Protocol', desc:'Quantum key distribution', code:BB84_CODE },
+  { id:'e91', icon:'🔗', label:'E91 Protocol', desc:'Entanglement-based QKD', code:E91_PROTO_CODE },
+  { id:'teleport-proto', icon:'🚀', label:'Teleportation', desc:'Teleport state to Bob', code:TELEPORT_PROTO_CODE },
+  { id:'superdense-proto', icon:'📦', label:'Superdense Coding', desc:'2 bits via 1 qubit', code:SUPERDENSE_PROTO_CODE },
   { id:'custom-proto', icon:'✏️', label:'Custom Protocol', desc:'Write your own', code:CUSTOM_PROTO_CODE },
 ];
 
