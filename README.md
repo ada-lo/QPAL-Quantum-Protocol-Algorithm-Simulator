@@ -1,61 +1,83 @@
-# QPAL — Quantum Protocol & Algorithm Simulator
+# QPAL — Quantum Protocol & Algorithm Lab
 
-A React + Vite frontend and FastAPI backend for a pseudocode-first quantum protocol workspace.
+An interactive workspace for understanding, analyzing, and experimenting with quantum algorithms and communication protocols.
 
-The app now centers on one integrated simulator page:
+QPAL is built for researchers, developers, and advanced learners who want to:
 
-- No sidebar-driven protocol/algorithm demos
-- Editable custom pseudo language
-- Local TypeScript parser with structured JSON output
-- Backend-owned step-by-step execution state
-- Circuit timeline, Bloch inspector, docs, and benchmarks in one place
-- Light and dark themes
+- **Define** protocols and algorithms in a pseudocode-first language
+- **Simulate** execution with step-by-step state tracing
+- **Inspect** qubit state, measurement outcomes, and protocol flow at every step
+- **Analyze** actor ownership, transport events, interception, and noise behavior
+- **Benchmark** performance across workloads (GHZ, QFT, Grover, QAOA-style circuits)
+- **Visualize** behavior through 3D Bloch spheres, protocol animators, and circuit timelines
 
-## What Changed
-
-- The old routed lesson sidebar was removed from the active app shell.
-- Protocols and algorithms are now loaded as integrated pseudocode templates.
-- The frontend parses pseudocode and immediately shows clean instruction objects.
-- The backend executes the simplified quantum and actor/transport logic.
-- The right inspector pane is resizable.
-- Bloch spheres now support zoom through OrbitControls.
-- Backend benchmarks now expose machine-aware CPU/GPU timing for GHZ, QFT, Grover, and QAOA-style workloads.
-
-## Project Structure
+## Architecture
 
 ```text
 frontend/
-  src/components/workspace/   integrated workspace UI
+  src/components/workspace/   main workspace UI
+  src/components/protocols/   protocol animators (BB84, B92, E91, QEC)
+  src/components/learning/    3D studio inspector
   src/lib/workspace/          parser, API client, shared types
+  src/lib/quantum/            gates, simulator, pseudocode catalog
+  src/store/                  workspace state management
+
 backend/
   api/routes/workspace.py     workspace endpoints
   api/schemas/workspace.py    workspace request/response models
   core/workspace/             catalog, executor, benchmarks
+
 docs/
   WORKSPACE_GUIDE.md          syntax, architecture, and usage guide
 ```
 
-## Main Endpoints
+## Workspace Flow
 
-- `GET /api/workspace/catalog`
-- `POST /api/workspace/simulate`
-- `POST /api/workspace/benchmarks`
-- `GET /health`
-- Existing simulation, noise, protocol, and QDD routes are still present for the older backend features.
+1. **Load or write** a protocol/algorithm using the built-in pseudocode language
+2. **Run** the backend executor to simulate step-by-step
+3. **Step through** the execution timeline — inspect state, measurements, and transport events
+4. **Switch views** between the circuit editor and pseudo language tabs
+5. **Inspect** via the right-pane tabs: 3D Studio, State, Bloch, Benchmarks, Docs
+
+## Main API Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/workspace/catalog` | List available templates, benchmarks, syntax docs |
+| `POST /api/workspace/simulate` | Execute a pseudocode program and return step traces |
+| `POST /api/workspace/benchmarks` | Run performance benchmarks |
+| `GET /health` | Backend health check |
 
 ## Run Locally
 
-### Backend
+### Quick Start (from repo root)
+
+```bash
+npm run dev:frontend    # starts Vite dev server on :5173
+npm run dev:backend     # starts uvicorn on :8000
+npm run test:backend    # runs pytest
+npm run build           # production frontend build
+```
+
+### Manual Setup
+
+**Backend:**
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-### Frontend
+> **Optional:** For the `/api/workspace/benchmarks` endpoint, install `qiskit` and `qiskit-aer`:
+> ```bash
+> pip install qiskit qiskit-aer
+> ```
+> The rest of the API works without them.
+
+**Frontend:**
 
 ```bash
 cd frontend
@@ -63,23 +85,10 @@ npm install
 npm run dev
 ```
 
-Frontend default: `http://localhost:5173`  
-Backend default: `http://localhost:8000`
-
-## Verification
-
-Verified during this refactor:
-
-- `frontend`: `npm run build`
-- `backend`: `python -m compileall .`
-- `backend`: `.venv\Scripts\python.exe -m pytest backend\tests\test_simulate.py backend\tests\test_noise.py backend\tests\test_workspace.py`
+Frontend: `http://localhost:5173`
+Backend: `http://localhost:8000`
 
 ## Documentation
 
-See `docs/WORKSPACE_GUIDE.md` for:
+See `docs/WORKSPACE_GUIDE.md` for pseudocode syntax, parser behavior, backend execution model, UI architecture, and benchmark design.
 
-- pseudo language syntax
-- parser behavior
-- backend execution model
-- UI architecture
-- benchmark design

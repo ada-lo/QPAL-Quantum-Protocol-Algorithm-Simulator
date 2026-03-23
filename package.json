@@ -1,8 +1,11 @@
 {
-  "name": "qpal-quantum-protocol-algorithm-simulator",
+  "name": "qpal-quantum-workspace",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/run-all-tests.js"
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "cd backend && python -m uvicorn main:app --reload --port 8000",
+    "build": "npm run build --prefix frontend",
+    "test:backend": "cd backend && python -m pytest tests/ -v"
   }
 }

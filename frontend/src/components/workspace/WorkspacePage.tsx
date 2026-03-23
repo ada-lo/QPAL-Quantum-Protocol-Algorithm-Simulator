@@ -39,8 +39,8 @@ const INSPECTOR_TABS = [
   { id: "docs", label: "Docs" },
 ] as const
 const WORKSPACE_VIEWS = [
-  { id: "circuit", label: "Circuit Editor" },
-  { id: "pseudocode", label: "Pseudo Language" },
+  { id: "circuit", label: "Circuit View" },
+  { id: "pseudocode", label: "Pseudocode Editor" },
 ] as const
 const STUDIO_ALIASES: Record<string, string> = {
   bell: "e91",
@@ -148,7 +148,7 @@ export function WorkspacePage() {
   const [benchmarking, setBenchmarking] = useState(false)
   const [activeStep, setActiveStep] = useState(0)
   const [activeInspector, setActiveInspector] = useState<InspectorTab>("studio")
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("circuit")
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("pseudocode")
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
   const [rightPaneWidth, setRightPaneWidth] = useState(430)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem("workspace-theme") === "dark" ? "dark" : "light"))
@@ -349,7 +349,7 @@ export function WorkspacePage() {
   function applySelection(option: WorkspaceModelOption) {
     setSelectedModelValue(option.value)
     setActiveInspector("studio")
-    setActiveWorkspaceView("circuit")
+    setActiveWorkspaceView("pseudocode")
 
     if (option.studioId) {
       selectLearningExperience(option.studioId)
@@ -424,21 +424,21 @@ export function WorkspacePage() {
     <div style={pageShellStyle}>
       <header style={workspaceHeaderStyle}>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
-          <div style={eyebrowStyle}>QUANTUM WORKSPACE</div>
+          <div style={eyebrowStyle}>QPAL WORKSPACE</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h1 style={workspaceTitleStyle}>{selectedModel?.title ?? "Integrated circuit workspace"}</h1>
+            <h1 style={workspaceTitleStyle}>{selectedModel?.title ?? "Quantum Experimentation Workspace"}</h1>
             <StatusBadge label={running ? "backend active" : "backend ready"} tone={running ? "info" : "success"} />
             {selectedModel && <StatusBadge label={selectedModel.kindLabel} tone="neutral" />}
           </div>
           <p style={workspaceCopyStyle}>
             {selectedModel?.description ??
-              "Keep the circuit editor visible, switch into pseudocode when you want to write logic, and inspect the backend runtime from the same workspace."}
+              "Define quantum algorithms and protocols in pseudocode, simulate execution step by step, and inspect qubit state, measurement outcomes, and protocol behavior."}
           </p>
         </div>
 
         <div style={headerRailStyle}>
           <div style={controlBoxStyle}>
-            <div style={controlLabelStyle}>Load algorithm/protocol</div>
+            <div style={controlLabelStyle}>Load experiment</div>
             <select
               value={selectedModelValue}
               onChange={(event) => {
@@ -471,7 +471,7 @@ export function WorkspacePage() {
 
           <ToolbarButton
             icon={RefreshCw}
-            label={running ? "Running backend" : "Run backend"}
+            label={running ? "Simulating..." : "Run simulation"}
             style={primaryButtonStyle}
             onClick={handleRunWorkspace}
             disabled={activeWorkspaceView === "pseudocode" && (parsed.errors.length > 0 || parsed.instructions.length === 0)}
@@ -483,8 +483,8 @@ export function WorkspacePage() {
       <div ref={containerRef} className="workspace-main" style={{ "--workspace-right-width": `${rightPaneWidth}px` } as CSSProperties}>
         <section className="workspace-pane workspace-left-pane">
           <SectionCard
-            title="Runtime Rail"
-            subtitle="The backend execution trace follows whichever model is currently loaded."
+            title="Execution Timeline"
+            subtitle="Step through the simulation trace — inspect state changes, measurements, and transport events at each instruction."
             action={
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <StatusBadge label={`${simulation?.summary.total_steps ?? parsed.instructions.length} steps`} tone="neutral" />
@@ -526,11 +526,11 @@ export function WorkspacePage() {
           </SectionCard>
 
           <SectionCard
-            title={activeWorkspaceView === "circuit" ? "Circuit Editor" : "Pseudo Language"}
+            title={activeWorkspaceView === "circuit" ? "Circuit View" : "Pseudocode Editor"}
             subtitle={
               activeWorkspaceView === "circuit"
-                ? "Use the grid as the main editor. Running the backend will write the matching pseudo language for this circuit."
-                : "Edit the custom pseudo language here, then switch back to the circuit view whenever you want."
+                ? "Visual circuit representation of the current program. Use as a secondary view alongside the pseudocode editor."
+                : "Write quantum programs in the QPAL pseudo language. The primary way to define experiments, protocols, and algorithms."
             }
             action={
               <div style={tabRailStyle}>

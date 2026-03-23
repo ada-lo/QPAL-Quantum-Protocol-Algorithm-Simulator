@@ -1,8 +1,10 @@
-# Workspace Guide
+# QPAL Workspace Guide
 
 ## Overview
 
-The current app is built around a single integrated simulator workspace.
+QPAL is an interactive quantum workspace for understanding, analyzing, and experimenting with quantum algorithms and communication protocols.
+
+The workspace follows a pseudocode-first flow:
 
 Flow:
 

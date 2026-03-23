@@ -1,0 +1,9 @@
+# ── Core (always required) ──────────────────────
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+
+# ── Benchmarks (optional — only needed for /api/workspace/benchmarks) ──
+# qiskit>=1.0.0
+# qiskit-aer>=0.13.0

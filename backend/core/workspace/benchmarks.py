@@ -4,10 +4,6 @@ import os
 import platform
 import time
 
-from qiskit import QuantumCircuit, transpile
-from qiskit.circuit.library import QFTGate
-from qiskit_aer import AerSimulator
-
 from api.schemas.workspace import (
     WorkspaceBenchmarkProfile,
     WorkspaceBenchmarkRequest,
@@ -16,11 +12,19 @@ from api.schemas.workspace import (
     WorkspaceSystemCapabilities,
 )
 from core.workspace.catalog import list_benchmark_profiles
-from utils.gpu_utils import get_gpu_info
+
+
+def _get_gpu_info() -> dict:
+    """Return GPU info dict. Returns empty/unavailable if helpers are missing."""
+    try:
+        from utils.gpu_utils import get_gpu_info
+        return get_gpu_info()
+    except ImportError:
+        return {"available": False, "name": None, "memory": None, "driver": None}
 
 
 def _collect_capabilities() -> WorkspaceSystemCapabilities:
-    gpu = get_gpu_info()
+    gpu = _get_gpu_info()
     cpu_name = platform.processor() or platform.uname().processor or platform.uname().machine or "Unknown CPU"
     return WorkspaceSystemCapabilities(
         cpu=cpu_name,
@@ -32,7 +36,21 @@ def _collect_capabilities() -> WorkspaceSystemCapabilities:
     )
 
 
-def _build_ghz(qubits: int) -> QuantumCircuit:
+def _require_qiskit():
+    """Import and return (QuantumCircuit, QFTGate, transpile, AerSimulator). Raises ImportError with a clear message."""
+    try:
+        from qiskit import QuantumCircuit, transpile
+        from qiskit.circuit.library import QFTGate
+        from qiskit_aer import AerSimulator
+        return QuantumCircuit, QFTGate, transpile, AerSimulator
+    except ImportError as exc:
+        raise ImportError(
+            "Benchmarks require 'qiskit' and 'qiskit-aer'. "
+            "Install them with: pip install qiskit qiskit-aer"
+        ) from exc
+
+
+def _build_ghz(QuantumCircuit, qubits: int):
     qc = QuantumCircuit(qubits, name="ghz")
     qc.h(0)
     for idx in range(qubits - 1):
@@ -41,14 +59,14 @@ def _build_ghz(qubits: int) -> QuantumCircuit:
     return qc
 
 
-def _build_qft(qubits: int) -> QuantumCircuit:
+def _build_qft(QuantumCircuit, QFTGate, qubits: int):
     qc = QuantumCircuit(qubits, name="qft")
     qc.compose(QFTGate(num_qubits=qubits), inplace=True)
     qc.save_statevector()
     return qc
 
 
-def _build_grover(qubits: int) -> QuantumCircuit:
+def _build_grover(QuantumCircuit, qubits: int):
     qc = QuantumCircuit(qubits, name="grover")
     for idx in range(qubits):
         qc.h(idx)
@@ -73,7 +91,7 @@ def _build_grover(qubits: int) -> QuantumCircuit:
     return qc
 
 
-def _build_qaoa(qubits: int, layers: int = 2) -> QuantumCircuit:
+def _build_qaoa(QuantumCircuit, qubits: int, layers: int = 2):
     qc = QuantumCircuit(qubits, name="qaoa")
     for idx in range(qubits):
         qc.h(idx)
@@ -88,15 +106,7 @@ def _build_qaoa(qubits: int, layers: int = 2) -> QuantumCircuit:
     return qc
 
 
-BUILDERS = {
-    "ghz": _build_ghz,
-    "qft": _build_qft,
-    "grover": _build_grover,
-    "qaoa": _build_qaoa,
-}
-
-
-def _make_simulator(prefer_gpu: bool) -> tuple[AerSimulator, str, bool]:
+def _make_simulator(AerSimulator, prefer_gpu: bool):
     if prefer_gpu:
         try:
             simulator = AerSimulator(method="statevector", device="GPU")
@@ -106,10 +116,17 @@ def _make_simulator(prefer_gpu: bool) -> tuple[AerSimulator, str, bool]:
     return AerSimulator(method="statevector"), "aer-cpu-statevector", False
 
 
-def _run_profile(profile: WorkspaceBenchmarkProfile, repetitions: int, prefer_gpu: bool) -> WorkspaceBenchmarkResult:
-    builder = BUILDERS[profile.id]
+def _run_profile(profile: WorkspaceBenchmarkProfile, repetitions: int, prefer_gpu: bool,
+                 QuantumCircuit, QFTGate, transpile, AerSimulator) -> WorkspaceBenchmarkResult:
+    builders = {
+        "ghz": lambda q: _build_ghz(QuantumCircuit, q),
+        "qft": lambda q: _build_qft(QuantumCircuit, QFTGate, q),
+        "grover": lambda q: _build_grover(QuantumCircuit, q),
+        "qaoa": lambda q: _build_qaoa(QuantumCircuit, q),
+    }
+    builder = builders[profile.id]
     circuit = builder(profile.qubits)
-    simulator, engine_used, gpu_used = _make_simulator(prefer_gpu)
+    simulator, engine_used, gpu_used = _make_simulator(AerSimulator, prefer_gpu)
     transpiled = transpile(circuit, simulator)
 
     durations = []
@@ -134,11 +151,17 @@ def _run_profile(profile: WorkspaceBenchmarkProfile, repetitions: int, prefer_gp
 
 
 def run_benchmarks(req: WorkspaceBenchmarkRequest) -> WorkspaceBenchmarkResponse:
+    QuantumCircuit, QFTGate, transpile, AerSimulator = _require_qiskit()
+
     profiles = list_benchmark_profiles()
     selected = set(req.benchmark_ids or [profile.id for profile in profiles])
     chosen = [profile for profile in profiles if profile.id in selected]
 
-    results = [_run_profile(profile, req.repetitions, req.prefer_gpu) for profile in chosen]
+    results = [
+        _run_profile(profile, req.repetitions, req.prefer_gpu,
+                     QuantumCircuit, QFTGate, transpile, AerSimulator)
+        for profile in chosen
+    ]
     used_gpu = any(result.gpu_used for result in results)
 
     return WorkspaceBenchmarkResponse(
