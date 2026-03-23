@@ -1,109 +1,85 @@
 # QPAL — Quantum Protocol & Algorithm Simulator
 
-QPAL is an interactive quantum learning and experimentation environment focused on two things:
+A React + Vite frontend and FastAPI backend for a pseudocode-first quantum protocol workspace.
 
-- algorithm simulation with a code-first workflow
-- communication protocol visualization with Alice/Bob/Eve style actors
+The app now centers on one integrated simulator page:
 
-The project in this repository is a zero-build browser app backed by modular ES modules and a lightweight Node test suite. It is intentionally educational: the simulator uses a simplified state model so learners can see behavior, steps, and channel effects without needing a heavy backend.
+- No sidebar-driven protocol/algorithm demos
+- Editable custom pseudo language
+- Local TypeScript parser with structured JSON output
+- Backend-owned step-by-step execution state
+- Circuit timeline, Bloch inspector, docs, and benchmarks in one place
+- Light and dark themes
 
-## What Is Implemented
+## What Changed
 
-- Algorithm mode with Bell state, GHZ state, teleportation, superdense coding, Deutsch's algorithm, SWAP test, and custom pseudo-code circuits
-- Protocol mode with BB84, E91, teleportation flow, superdense coding flow, and custom multi-party pseudo-code
-- A pseudo-language parser for `INIT`, `H`, `X`, `CNOT`, `MEASURE`, `ACTOR`, `ASSIGN`, `SEND`, and `INTERCEPT`
-- Step-by-step execution with circuit, state, channel, and event-log views
-- Statistical security panels for BB84 and E91 with Eve toggling and shared-key/error summaries
-- Modular source files in `qpal/src/` that mirror the standalone browser app presets and analytics
-- Node-based regression tests for parsing, preset catalog integrity, and protocol analytics
-
-## Quick Start
-
-### Run the app
-
-Open `qpal/index.html` in a modern browser.
-
-You can also open the mirrored root copy:
-
-- `qpal/index.html`
-- `qpal-index.html`
-
-No build step or server is required.
-
-### Run the tests
-
-```bash
-npm test
-```
-
-This uses Node's built-in test runner and does not require extra dependencies.
-
-## Architecture
-
-```text
-User code / preset
-        ↓
-Parser
-        ↓
-ExecutionController
-        ↓
-QuantumEngine
-        ↓
-Visualization + protocol analytics
-```
-
-### Main layers
-
-- `qpal/src/parser/parser.js`: pseudo-language to instruction objects
-- `qpal/src/engine/engine.js`: simplified qubit, gate, actor, and channel behavior
-- `qpal/src/engine/controller.js`: run/step/reset orchestration
-- `qpal/src/presets/`: algorithm presets, protocol presets, catalogs, and analytics helpers
-- `qpal/index.html`: full standalone experience
+- The old routed lesson sidebar was removed from the active app shell.
+- Protocols and algorithms are now loaded as integrated pseudocode templates.
+- The frontend parses pseudocode and immediately shows clean instruction objects.
+- The backend executes the simplified quantum and actor/transport logic.
+- The right inspector pane is resizable.
+- Bloch spheres now support zoom through OrbitControls.
+- Backend benchmarks now expose machine-aware CPU/GPU timing for GHZ, QFT, Grover, and QAOA-style workloads.
 
 ## Project Structure
 
 ```text
-QPAL-Quantum-Protocol-Algorithm-Simulator/
-├── package.json
-├── qpal-index.html
-├── qpal/
-│   ├── index.html
-│   ├── README.md
-│   └── src/
-│       ├── engine/
-│       ├── parser/
-│       └── presets/
-└── tests/
+frontend/
+  src/components/workspace/   integrated workspace UI
+  src/lib/workspace/          parser, API client, shared types
+backend/
+  api/routes/workspace.py     workspace endpoints
+  api/schemas/workspace.py    workspace request/response models
+  core/workspace/             catalog, executor, benchmarks
+docs/
+  WORKSPACE_GUIDE.md          syntax, architecture, and usage guide
 ```
 
-## Simulation Model
+## Main Endpoints
 
-QPAL currently uses a simplified instructional model rather than a full state-vector or density-matrix backend.
+- `GET /api/workspace/catalog`
+- `POST /api/workspace/simulate`
+- `POST /api/workspace/benchmarks`
+- `GET /health`
+- Existing simulation, noise, protocol, and QDD routes are still present for the older backend features.
 
-That means it is well suited for:
+## Run Locally
 
-- classroom demos
-- concept exploration
-- protocol storytelling
-- rapid pseudo-code experiments
+### Backend
 
-It is not yet a mathematically exact replacement for Qiskit, Cirq, or hardware-backed simulators.
+```bash
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
 
-## Roadmap
+### Frontend
 
-### Near term
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-- finish moving standalone UI logic into reusable modules
-- add more deterministic testing around protocol analytics
-- improve conditional correction handling in teleportation-style examples
+Frontend default: `http://localhost:5173`  
+Backend default: `http://localhost:8000`
 
-### Future extensions
+## Verification
 
-- richer gate set and basis handling
-- noise models
-- export/share features
-- optional integration with real quantum SDKs
+Verified during this refactor:
 
-## License
+- `frontend`: `npm run build`
+- `backend`: `python -m compileall .`
+- `backend`: `.venv\Scripts\python.exe -m pytest backend\tests\test_simulate.py backend\tests\test_noise.py backend\tests\test_workspace.py`
 
-MIT
+## Documentation
+
+See `docs/WORKSPACE_GUIDE.md` for:
+
+- pseudo language syntax
+- parser behavior
+- backend execution model
+- UI architecture
+- benchmark design
