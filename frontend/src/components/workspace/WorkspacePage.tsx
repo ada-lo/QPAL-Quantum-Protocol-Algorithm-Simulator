@@ -152,6 +152,7 @@ export function WorkspacePage() {
   const [activeInspector, setActiveInspector] = useState<InspectorTab>("studio")
   const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("pseudocode")
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
+  const [presetPickerValue, setPresetPickerValue] = useState("")
   const [rightPaneWidth, setRightPaneWidth] = useState(430)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem("workspace-theme") === "dark" ? "dark" : "light"))
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -210,6 +211,7 @@ export function WorkspacePage() {
   }, [catalog])
 
   const selectedModel = selectionOptions.find((option) => option.value === selectedModelValue) ?? null
+  const presetSelectionOptions = useMemo(() => selectionOptions.filter((option) => option.source === "preset" && option.preset), [selectionOptions])
   const filteredTemplates = useMemo(() => filterRelatedTemplates(selectedModel, catalog?.templates ?? []), [catalog?.templates, selectedModel])
   const filteredBenchmarks = useMemo(() => filterRelatedBenchmarks(selectedModel, catalog?.benchmarks ?? []), [catalog?.benchmarks, selectedModel])
   const parsed = useMemo(() => parsePseudoProgram(source), [source])
@@ -348,7 +350,33 @@ export function WorkspacePage() {
     }
   }
 
+  function applyPresetSelection(option: WorkspaceModelOption) {
+    if (!option.preset) return
+
+    setSelectedModelValue(option.value)
+    setActiveInspector("studio")
+
+    if (option.studioId) {
+      selectLearningExperience(option.studioId)
+    }
+
+    loadPreset(option.preset.gates, option.preset.nQubits)
+    setSource(
+      circuitSnapshotToProgram({
+        nQubits: option.preset.nQubits,
+        gates: option.preset.gates.map((gate, index) => ({ ...gate, id: `preset-${option.preset?.id}-${index}` })),
+        initialStates: Array.from({ length: option.preset.nQubits }, () => "|0⟩" as const),
+      }),
+    )
+  }
+
   function applySelection(option: WorkspaceModelOption) {
+    if (option.preset) {
+      setActiveWorkspaceView("pseudocode")
+      applyPresetSelection(option)
+      return
+    }
+
     setSelectedModelValue(option.value)
     setActiveInspector("studio")
     setActiveWorkspaceView("pseudocode")
@@ -380,16 +408,6 @@ export function WorkspacePage() {
       return
     }
 
-    if (option.preset) {
-      loadPreset(option.preset.gates, option.preset.nQubits)
-      setSource(
-        circuitSnapshotToProgram({
-          nQubits: option.preset.nQubits,
-          gates: option.preset.gates.map((gate, index) => ({ ...gate, id: `preset-${option.preset?.id}-${index}` })),
-          initialStates: Array.from({ length: option.preset.nQubits }, () => "|0⟩" as const),
-        }),
-      )
-    }
   }
 
   function handleResizeStart(event: ReactPointerEvent<HTMLDivElement>) {
@@ -535,21 +553,45 @@ export function WorkspacePage() {
                 : "Write quantum programs in the QPAL pseudo language. The primary way to define experiments, protocols, and algorithms."
             }
             action={
-              <div style={tabRailStyle}>
-                {WORKSPACE_VIEWS.map((view) => (
-                  <button
-                    key={view.id}
-                    onClick={() => handleWorkspaceViewChange(view.id)}
-                    style={{
-                      ...tabButtonStyle,
-                      borderColor: activeWorkspaceView === view.id ? "var(--accent-cyan)" : "var(--border)",
-                      color: activeWorkspaceView === view.id ? "var(--text-primary)" : "var(--text-secondary)",
-                      background: activeWorkspaceView === view.id ? "var(--bg-active)" : "transparent",
+              <div style={workspaceViewActionStyle}>
+                <div style={tabRailStyle}>
+                  {WORKSPACE_VIEWS.map((view) => (
+                    <button
+                      key={view.id}
+                      onClick={() => handleWorkspaceViewChange(view.id)}
+                      style={{
+                        ...tabButtonStyle,
+                        borderColor: activeWorkspaceView === view.id ? "var(--accent-cyan)" : "var(--border)",
+                        color: activeWorkspaceView === view.id ? "var(--text-primary)" : "var(--text-secondary)",
+                        background: activeWorkspaceView === view.id ? "var(--bg-active)" : "transparent",
+                      }}
+                    >
+                      {view.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={presetPickerStyle}>
+                  <div style={presetPickerLabelStyle}>Circuit presets</div>
+                  <select
+                    aria-label="Load circuit preset"
+                    value={presetPickerValue}
+                    onChange={(event) => {
+                      const option = presetSelectionOptions.find((item) => item.value === event.target.value)
+                      if (!option) return
+                      applyPresetSelection(option)
+                      setPresetPickerValue("")
                     }}
+                    style={{ ...selectControlStyle, ...presetPickerSelectStyle }}
                   >
-                    {view.label}
-                  </button>
-                ))}
+                    <option value="">Load preset</option>
+                    {presetSelectionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             }
           >
@@ -1008,12 +1050,40 @@ const tabRailStyle: CSSProperties = {
   flexWrap: "wrap",
 }
 
+const workspaceViewActionStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 10,
+  flexWrap: "wrap",
+}
+
 const tabButtonStyle: CSSProperties = {
   padding: "8px 12px",
   borderRadius: "var(--radius-md)",
   border: "1px solid var(--border)",
   fontSize: 12,
   fontWeight: 600,
+}
+
+const presetPickerStyle: CSSProperties = {
+  minWidth: 180,
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+}
+
+const presetPickerLabelStyle: CSSProperties = {
+  fontSize: 10,
+  color: "var(--text-muted)",
+  fontFamily: "var(--font-mono)",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+}
+
+const presetPickerSelectStyle: CSSProperties = {
+  minWidth: 180,
+  width: "100%",
 }
 
 const pseudocodeShellStyle: CSSProperties = {
