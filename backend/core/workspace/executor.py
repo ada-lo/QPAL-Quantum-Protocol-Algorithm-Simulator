@@ -181,15 +181,23 @@ class _MiniSV:
             self.apply_x(q)
             self.apply_h(q)
 
-    def measure_qubit(self, q: int, rng: random.Random) -> int:
-        """Measure qubit q, collapse the state, return 0 or 1."""
+    def measure_qubit(self, q: int, rng: random.Random, basis: str = "Z") -> int:
+        """Measure qubit q in the given basis, collapse the state, return 0 or 1.
+
+        For X-basis: apply H, collapse in Z, apply H again.
+        This ensures |+⟩ → outcome 0, |−⟩ → outcome 1.
+        """
         if not self.active:
             return rng.randint(0, 1)
+        if basis == "X":
+            self.apply_h(q)  # rotate X-eigenstates to Z-eigenstates
         dim = 1 << self.n
         sv = self.sv
         prob0 = sum(abs(sv[i]) ** 2 for i in range(dim) if (i >> q) & 1 == 0)
         outcome = 0 if rng.random() < prob0 else 1
         self._collapse_qubit(q, outcome)
+        if basis == "X":
+            self.apply_h(q)  # rotate back to X-eigenstates
         return outcome
 
     def _collapse_qubit(self, q: int, outcome: int) -> None:
@@ -516,6 +524,9 @@ def _handle_intercept(
     transmissions: list[TransmissionRecord],
     warnings: list[str],
     rng: random.Random,
+    mini_sv: _MiniSV,
+    qubit_index_map: dict[str, int],
+    _sv_index_fn: object = None,
 ) -> str:
     qubit_id = instruction.qubits[0]
     actor_name = instruction.actors[0]
@@ -524,7 +535,12 @@ def _handle_intercept(
 
     disturbed = qubit["superposition"] or bool(qubit["entangled_with"])
     if disturbed:
-        hidden_value = _measure_value(qubit["state_label"], "Z", rng)
+        # Collapse the statevector so Bloch vectors stay in sync
+        qi = qubit_index_map.get(qubit_id)
+        if mini_sv.active and qi is not None:
+            hidden_value = mini_sv.measure_qubit(qi, rng, "Z")
+        else:
+            hidden_value = _measure_value(qubit["state_label"], "Z", rng)
         partners = list(qubit["entangled_with"])
         _clear_entanglement(qubits, qubit_id)
         _set_state(qubit, "1" if hidden_value == 1 else "0")
@@ -763,10 +779,11 @@ def simulate_workspace(req: WorkspaceSimulateRequest) -> WorkspaceSimulateRespon
             # Use the mini-sv measurement outcome for consistency
             qubit_id = instruction.qubits[0]
             qi = _sv_index(qubit_id)
-            sv_outcome = mini_sv.measure_qubit(qi, rng)
+            basis = instruction.basis or "Z"
+            # Collapse in the correct basis (X-basis applies H→Z→H internally)
+            sv_outcome = mini_sv.measure_qubit(qi, rng, basis)
             # Now run the symbolic side with the same outcome
             qubit = _autoinit(qubits, qubit_id, warnings, "MEASURE")
-            basis = instruction.basis or "Z"
             collapsed_label = _label_from_measurement(basis, sv_outcome)
             partners = list(qubit["entangled_with"])
             _clear_entanglement(qubits, qubit_id)
@@ -807,7 +824,7 @@ def simulate_workspace(req: WorkspaceSimulateRequest) -> WorkspaceSimulateRespon
             )
             event = f"Sent {qubit['id']} from {from_actor} to {to_actor}."
         elif opcode == "INTERCEPT":
-            event = _handle_intercept(instruction, index, qubits, actors, transmissions, warnings, rng)
+            event = _handle_intercept(instruction, index, qubits, actors, transmissions, warnings, rng, mini_sv, qubit_index_map)
         elif opcode in {"LABEL", "NOTE", "WAIT", "BARRIER"}:
             event = instruction.label or instruction.raw
         else:

@@ -58,7 +58,7 @@ def _build_ghz(n: int) -> Callable[[_MiniSV], int]:
         sv.apply_h(0)
         for i in range(n - 1):
             sv.apply_cnot(i, i + 1)
-        return n + (n - 1)  # gate count
+        return 1 + (n - 1)  # 1 H + (n-1) CNOTs = n gates
     return run
 
 

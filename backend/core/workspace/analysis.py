@@ -46,15 +46,21 @@ def compute_entanglement(sv: _MiniSV) -> EntanglementMetrics:
     """Compute entanglement metrics using toqito (if available)."""
     rho = _build_density_matrix(sv)
     n_qubits = sv.n
+    dim = len(rho)
 
-    # Purity
-    rho_np = _rho_to_numpy(rho)
-    purity = float(abs((rho_np @ rho_np).trace()))
+    # Pure-Python purity: Tr(ρ²)
+    purity_val = 0.0
+    for i in range(dim):
+        for j in range(dim):
+            purity_val += (rho[i][j] * rho[j][i]).real
+    purity_val = min(round(purity_val, 6), 1.0)
 
     try:
+        import numpy as np
         from toqito.state_metrics import concurrence as toqito_concurrence
-        from toqito.state_props import is_pure, negativity as toqito_negativity
+        from toqito.state_props import negativity as toqito_negativity
 
+        rho_np = np.array(rho, dtype=complex)
         conc = float(toqito_concurrence(rho_np)) if n_qubits == 2 else None
         neg = float(toqito_negativity(rho_np, [2] * n_qubits, 0)) if n_qubits >= 2 else None
         is_ent = conc is not None and conc > 1e-6
@@ -62,16 +68,15 @@ def compute_entanglement(sv: _MiniSV) -> EntanglementMetrics:
         return EntanglementMetrics(
             concurrence=conc,
             negativity=neg,
-            purity=round(purity, 6),
+            purity=purity_val,
             is_entangled=is_ent,
             engine="toqito",
         )
     except ImportError:
-        # Fallback: compute just purity without toqito
         return EntanglementMetrics(
             concurrence=None,
             negativity=None,
-            purity=round(purity, 6),
+            purity=purity_val,
             is_entangled=None,
             engine="builtin-purity-only",
         )

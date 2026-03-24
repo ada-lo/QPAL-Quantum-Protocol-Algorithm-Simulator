@@ -20,6 +20,7 @@ import type {
 import { useCircuitStore } from "@/store/circuitStore"
 import { useLearningStore } from "@/store/learningStore"
 import { BenchmarksPanel, BlochInspector, DocsPanel, StateInspector } from "./WorkspaceInspectors"
+import WorkspaceAnalysisPanel from "./WorkspaceAnalysisPanel"
 import { WorkspaceCircuitBuilder } from "./WorkspaceCircuitBuilder"
 
 const DEFAULT_PROGRAM = `LABEL Bell Pair
@@ -36,6 +37,7 @@ const INSPECTOR_TABS = [
   { id: "state", label: "State" },
   { id: "bloch", label: "Bloch" },
   { id: "benchmarks", label: "Benchmarks" },
+  { id: "analysis", label: "Analysis" },
   { id: "docs", label: "Docs" },
 ] as const
 const WORKSPACE_VIEWS = [
@@ -645,6 +647,7 @@ export function WorkspacePage() {
               <BenchmarksPanel benchmarks={benchmarks} benchmarking={benchmarking} onRun={handleRunBenchmarks} profiles={filteredBenchmarks} context={inspectorContext} />
             )}
             {activeInspector === "docs" && <DocsPanel syntax={catalog?.syntax ?? []} templates={filteredTemplates} notes={catalog?.architecture_notes ?? []} context={inspectorContext} />}
+            {activeInspector === "analysis" && <WorkspaceAnalysisPanel />}
           </SectionCard>
         </aside>
       </div>

@@ -115,3 +115,68 @@ def test_bloch_post_measurement_pure():
     assert abs(v.purity - 1.0) < 0.01
     # z should be either +1 or -1
     assert abs(abs(v.z) - 1.0) < 0.01
+
+
+def test_x_basis_measurement_collapses_correctly():
+    """INIT |0⟩ → MEASURE BASIS X should collapse to |+⟩ or |−⟩, not stay on Z-axis.
+
+    The Bloch vector after X-basis measurement must lie on the ±X axis,
+    not the ±Z axis (which would indicate the bug where only Z-basis collapse was done).
+    """
+    req = WorkspaceSimulateRequest(
+        seed=42,
+        instructions=[
+            WorkspaceInstruction(line=1, raw="INIT q0", opcode="INIT", args=["q0"], qubits=["q0"], category="quantum", metadata={"state": "0"}),
+            WorkspaceInstruction(line=2, raw="MEASURE q0 BASIS X", opcode="MEASURE", args=["q0", "BASIS", "X"], qubits=["q0"], basis="X", category="quantum", metadata={}),
+        ],
+    )
+    result = simulate_workspace(req)
+    v = result.final_state.bloch_vectors[0]
+    meas = result.measurement_results[0]
+    # Outcome recorded correctly
+    assert meas.basis == "X"
+    assert meas.value in (0, 1)
+    # After X-basis measurement the qubit should be on the ±X axis (purity ≈ 1)
+    assert abs(v.purity - 1.0) < 0.01, f"Expected pure state, got purity={v.purity}"
+    assert abs(abs(v.x) - 1.0) < 0.01, f"Expected |x|≈1 (X eigenstate), got x={v.x}"
+    assert abs(v.z) < 0.01, f"Expected z≈0 (not Z eigenstate), got z={v.z}"
+
+
+def test_intercept_syncs_statevector():
+    """INIT |0⟩ → H → INTERCEPT should collapse to a Z-basis state in the statevector.
+
+    Before the fix, INTERCEPT only updated the symbolic model but left _MiniSV
+    unchanged, so the Bloch vector stayed at |+⟩ instead of collapsing.
+    """
+    req = WorkspaceSimulateRequest(
+        seed=7,
+        instructions=[
+            WorkspaceInstruction(line=1, raw="INIT q0", opcode="INIT", args=["q0"], qubits=["q0"], category="quantum", metadata={"state": "0"}),
+            WorkspaceInstruction(line=2, raw="H q0", opcode="H", args=["q0"], qubits=["q0"], category="quantum", metadata={}),
+            WorkspaceInstruction(line=3, raw="INTERCEPT q0 Eve", opcode="INTERCEPT", args=["q0", "Eve"], qubits=["q0"], actors=["Eve"], category="transport", metadata={}),
+        ],
+    )
+    result = simulate_workspace(req)
+    v = result.final_state.bloch_vectors[0]
+    # After interception of |+⟩ state, qubit should collapse to |0⟩ or |1⟩ in Z-basis
+    assert abs(v.purity - 1.0) < 0.01, f"Expected pure state after intercept, got purity={v.purity}"
+    assert abs(abs(v.z) - 1.0) < 0.01, f"Expected z=±1 (Z eigenstate), got z={v.z}"
+    assert abs(v.x) < 0.01, f"Expected x≈0 after Z-collapse, got x={v.x}"
+
+
+def test_analysis_endpoint():
+    """POST /api/workspace/analyze should run and return valid data."""
+    from core.workspace.analysis import run_analysis
+    from api.schemas.workspace import WorkspaceAnalysisRequest
+
+    req = WorkspaceAnalysisRequest(qubits=2, run_entanglement=True, run_landscape=True)
+    result = run_analysis(req)
+    # Entanglement metrics should always return purity
+    assert result.entanglement is not None
+    assert result.entanglement.purity == 1.0
+    # Landscape should return grid data
+    assert result.landscape is not None
+    assert len(result.landscape.angles_x) > 0
+    assert len(result.landscape.angles_y) > 0
+    assert len(result.landscape.energies) > 0
+
