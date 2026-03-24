@@ -53,7 +53,13 @@ export function BlochScene({ bv }: Props) {
         <meshBasicMaterial color={arrowColor} transparent opacity={0.5} />
       </mesh>
 
-      {/* Axes */}
+      {/* Ghost sphere: visible when purity < 0.95 to show mixed-state boundary */}
+      {purity < 0.95 && purity > 0.02 && (
+        <mesh scale={[purity, purity, purity]}>
+          <sphereGeometry args={[1, 20, 20]} />
+          <meshBasicMaterial color={arrowColor} wireframe transparent opacity={0.18} />
+        </mesh>
+      )}
       {([
         [[1.25,0,0], 0xff4455],
         [[0,1.25,0], 0x10b981],

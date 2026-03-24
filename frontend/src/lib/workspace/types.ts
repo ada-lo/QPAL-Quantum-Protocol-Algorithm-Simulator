@@ -49,6 +49,7 @@ export interface WorkspaceBlochVector {
   x: number
   y: number
   z: number
+  purity?: number
 }
 
 export interface WorkspaceQubitState {

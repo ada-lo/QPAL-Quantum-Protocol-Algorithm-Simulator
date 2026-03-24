@@ -3,13 +3,15 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from api.schemas.workspace import (
+    WorkspaceAnalysisRequest,
+    WorkspaceAnalysisResponse,
     WorkspaceBenchmarkRequest,
     WorkspaceBenchmarkResponse,
     WorkspaceCatalogResponse,
     WorkspaceSimulateRequest,
     WorkspaceSimulateResponse,
 )
-from core.workspace import get_workspace_catalog, run_benchmarks, simulate_workspace
+from core.workspace import get_workspace_catalog, run_analysis, run_benchmarks, simulate_workspace
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
@@ -27,3 +29,8 @@ async def workspace_simulate(req: WorkspaceSimulateRequest) -> WorkspaceSimulate
 @router.post("/benchmarks", response_model=WorkspaceBenchmarkResponse)
 async def workspace_benchmarks(req: WorkspaceBenchmarkRequest) -> WorkspaceBenchmarkResponse:
     return run_benchmarks(req)
+
+
+@router.post("/analyze", response_model=WorkspaceAnalysisResponse)
+async def workspace_analyze(req: WorkspaceAnalysisRequest) -> WorkspaceAnalysisResponse:
+    return run_analysis(req)

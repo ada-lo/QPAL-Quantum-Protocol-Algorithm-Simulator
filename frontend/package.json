@@ -24,6 +24,8 @@
     "d3": "^7.9.0",
     "framer-motion": "^11.11.0",
     "lucide-react": "^0.454.0",
+    "quantum-circuit": "^0.9.247",
+    "quantum-tensors": "^0.4.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.13.1",

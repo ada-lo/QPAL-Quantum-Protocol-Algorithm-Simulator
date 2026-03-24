@@ -43,3 +43,75 @@ def test_workspace_transport_and_intercept():
     assert result.final_state.qubits[0].intercepted_by == "Eve"
     assert len(result.final_state.transmissions) == 2
     assert result.final_state.transmissions[-1].status == "intercepted"
+
+
+def test_bloch_bell_state_entangled():
+    """After H → CNOT, both qubits should be maximally entangled: purity ≈ 0."""
+    req = WorkspaceSimulateRequest(
+        seed=42,
+        instructions=[
+            WorkspaceInstruction(line=1, raw="INIT q0", opcode="INIT", args=["q0"], qubits=["q0"], category="quantum", metadata={"state": "0"}),
+            WorkspaceInstruction(line=2, raw="INIT q1", opcode="INIT", args=["q1"], qubits=["q1"], category="quantum", metadata={"state": "0"}),
+            WorkspaceInstruction(line=3, raw="H q0", opcode="H", args=["q0"], qubits=["q0"], category="quantum", metadata={}),
+            WorkspaceInstruction(line=4, raw="CNOT q0 q1", opcode="CNOT", args=["q0", "q1"], qubits=["q0", "q1"], category="quantum", metadata={}),
+        ],
+    )
+    result = simulate_workspace(req)
+    bloch = {v.qubit: v for v in result.final_state.bloch_vectors}
+    # Both qubits should have purity ≈ 0 (maximally mixed reduced state)
+    for qid in ("q0", "q1"):
+        assert abs(bloch[qid].x) < 0.05, f"{qid} x should be ~0"
+        assert abs(bloch[qid].y) < 0.05, f"{qid} y should be ~0"
+        assert abs(bloch[qid].z) < 0.05, f"{qid} z should be ~0"
+        assert bloch[qid].purity < 0.05, f"{qid} purity should be ~0"
+
+
+def test_bloch_pure_zero():
+    """INIT |0⟩ should produce Bloch vector (0, 0, 1) with purity ≈ 1."""
+    req = WorkspaceSimulateRequest(
+        seed=1,
+        instructions=[
+            WorkspaceInstruction(line=1, raw="INIT q0", opcode="INIT", args=["q0"], qubits=["q0"], category="quantum", metadata={"state": "0"}),
+        ],
+    )
+    result = simulate_workspace(req)
+    v = result.final_state.bloch_vectors[0]
+    assert abs(v.x) < 0.01
+    assert abs(v.y) < 0.01
+    assert abs(v.z - 1.0) < 0.01
+    assert abs(v.purity - 1.0) < 0.01
+
+
+def test_bloch_plus_state():
+    """After H, qubit in |+⟩ should have Bloch vector ≈ (1, 0, 0)."""
+    req = WorkspaceSimulateRequest(
+        seed=2,
+        instructions=[
+            WorkspaceInstruction(line=1, raw="INIT q0", opcode="INIT", args=["q0"], qubits=["q0"], category="quantum", metadata={"state": "0"}),
+            WorkspaceInstruction(line=2, raw="H q0", opcode="H", args=["q0"], qubits=["q0"], category="quantum", metadata={}),
+        ],
+    )
+    result = simulate_workspace(req)
+    v = result.final_state.bloch_vectors[0]
+    assert abs(v.x - 1.0) < 0.01
+    assert abs(v.y) < 0.01
+    assert abs(v.z) < 0.01
+    assert abs(v.purity - 1.0) < 0.01
+
+
+def test_bloch_post_measurement_pure():
+    """After MEASURE, qubit should collapse to a pure state (purity ≈ 1)."""
+    req = WorkspaceSimulateRequest(
+        seed=99,
+        instructions=[
+            WorkspaceInstruction(line=1, raw="INIT q0", opcode="INIT", args=["q0"], qubits=["q0"], category="quantum", metadata={"state": "0"}),
+            WorkspaceInstruction(line=2, raw="H q0", opcode="H", args=["q0"], qubits=["q0"], category="quantum", metadata={}),
+            WorkspaceInstruction(line=3, raw="MEASURE q0 BASIS Z", opcode="MEASURE", args=["q0", "BASIS", "Z"], qubits=["q0"], basis="Z", category="quantum", metadata={}),
+        ],
+    )
+    result = simulate_workspace(req)
+    v = result.final_state.bloch_vectors[0]
+    # After measurement, purity should be ~1 (pure state)
+    assert abs(v.purity - 1.0) < 0.01
+    # z should be either +1 or -1
+    assert abs(abs(v.z) - 1.0) < 0.01

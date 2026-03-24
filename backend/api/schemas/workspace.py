@@ -45,6 +45,7 @@ class WorkspaceBlochVector(BaseModel):
     x: float
     y: float
     z: float
+    purity: float = 1.0
 
 
 class WorkspaceQubitState(BaseModel):
@@ -160,3 +161,50 @@ class WorkspaceBenchmarkResponse(BaseModel):
     results: list[WorkspaceBenchmarkResult] = Field(default_factory=list)
     used_gpu: bool = False
     reference_note: str
+
+
+# ── Analysis schemas ────────────────────────────────────────────────────────
+
+class EntanglementMetrics(BaseModel):
+    concurrence: float | None = None
+    negativity: float | None = None
+    purity: float = 1.0
+    is_entangled: bool | None = None
+    engine: str = "builtin"
+
+
+class LandscapeData(BaseModel):
+    angles_x: list[float] = Field(default_factory=list)
+    angles_y: list[float] = Field(default_factory=list)
+    energies: list[list[float]] = Field(default_factory=list)
+    circuit_type: str = "vqe"
+    plot_base64: str | None = None
+
+
+class StimResult(BaseModel):
+    circuit_type: str
+    qubits: int
+    noise_p: float = 0.0
+    shots: int = 1000
+    outcome_counts: dict[str, int] = Field(default_factory=dict)
+    fidelity: float | None = None
+    engine: str = "stim"
+
+
+class WorkspaceAnalysisRequest(BaseModel):
+    qubits: int | None = 2
+    run_entanglement: bool = False
+    run_landscape: bool = False
+    run_stim: bool = False
+    landscape_circuit: str | None = "vqe"
+    landscape_grid: int | None = 20
+    stim_circuit: str | None = "ghz"
+    stim_noise: float | None = 0.0
+    stim_shots: int | None = 1000
+
+
+class WorkspaceAnalysisResponse(BaseModel):
+    entanglement: EntanglementMetrics | None = None
+    landscape: LandscapeData | None = None
+    stim: StimResult | None = None
+

@@ -198,9 +198,11 @@ Integrated templates currently include:
 - BB84 With Eve
 - Teleportation Walkthrough
 - Superdense Coding
-- Grover-Inspired Search
-- QFT Signal Sketch
-- QAOA Round Sketch
+- Grover's Search *(PennyLane-derived)*
+- Quantum Fourier Transform *(PennyLane-derived)*
+- QAOA MaxCut *(PennyLane-derived)*
+- VQE Ansatz (H₂ molecule) *(PennyLane-derived)*
+- Quantum Phase Estimation *(PennyLane-derived)*
 
 They are all loaded from the backend catalog so the UI, syntax docs, and backend expectations stay aligned.
 

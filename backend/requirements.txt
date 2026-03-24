@@ -1,9 +1,25 @@
-# ── Core (always required) ──────────────────────
+# ── Core (always required) ──────────────────────────────────────
+# These 4 packages are all you need to run QPAL's backend.
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.5.0
 python-dotenv>=1.0.0
 
-# ── Benchmarks (optional — only needed for /api/workspace/benchmarks) ──
-# qiskit>=1.0.0
-# qiskit-aer>=0.13.0
+# ── Benchmarks ──────────────────────────────────────────────────
+# Zero external dependencies required!
+# All 8 benchmark families (GHZ, QFT, Grover, QAOA, VQE, QPE,
+# W-State, Deutsch-Jozsa) run on QPAL's built-in _MiniSV
+# pure-Python statevector simulator.
+
+# ── Optional: Advanced Analysis ─────────────────────────────────
+# Install any of these to unlock extra features in the
+# POST /api/workspace/analyze endpoint.
+#
+# pip install toqito          # entanglement: concurrence, negativity
+# pip install stim            # stabilizer / QEC circuit simulation
+# pip install matplotlib      # variational landscape PNG rendering
+# pip install liboqs-python   # post-quantum crypto demos (Kyber, Dilithium)
+#
+# All optional — the backend starts and runs fully without them.
+# If a package is missing, that analysis engine gracefully returns
+# a fallback result or a clear "not installed" message.

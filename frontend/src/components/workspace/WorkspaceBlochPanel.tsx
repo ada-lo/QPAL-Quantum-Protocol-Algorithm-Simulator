@@ -17,7 +17,8 @@ export function WorkspaceBlochPanel({ blochVectors }: { blochVectors: WorkspaceB
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
       {blochVectors.map((vector) => {
-        const purity = Math.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
+        const purity = vector.purity ?? Math.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
+        const purityColor = purity >= 0.95 ? "var(--accent-green, #4ade80)" : purity >= 0.4 ? "var(--accent-amber, #fbbf24)" : "var(--accent-red, #f87171)"
         return (
           <div
             key={vector.qubit}
@@ -35,8 +36,16 @@ export function WorkspaceBlochPanel({ blochVectors }: { blochVectors: WorkspaceB
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <strong style={{ fontSize: 16, color: "var(--text-primary)" }}>{vector.qubit}</strong>
-                <span style={{ fontSize: 12, color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>
-                  purity {(purity * 100).toFixed(0)}%
+                <span style={{
+                  fontSize: 11,
+                  color: purityColor,
+                  fontFamily: "var(--font-mono)",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  background: `color-mix(in srgb, ${purityColor} 15%, transparent)`,
+                  fontWeight: 600,
+                }}>
+                  {purity >= 0.95 ? "pure" : purity >= 0.4 ? "mixed" : "max-mixed"} {(purity * 100).toFixed(0)}%
                 </span>
               </div>
             </div>
