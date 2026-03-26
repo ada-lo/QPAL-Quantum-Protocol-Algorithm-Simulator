@@ -24,9 +24,12 @@ import type {
 import type { CircuitGate } from "@/store/circuitStore"
 import { useCircuitStore } from "@/store/circuitStore"
 import { useLearningStore } from "@/store/learningStore"
+import { useSimStore } from "@/store/simStore"
 import { BlochInspector, DocsPanel, StateInspector } from "./WorkspaceInspectors"
 import WorkspaceAnalysisPanel from "./WorkspaceAnalysisPanel"
 import { WorkspaceCircuitBuilder } from "./WorkspaceCircuitBuilder"
+import { PreFlightModal } from "./PreFlightModal"
+import { StepWalkthroughModal } from "./StepWalkthroughModal"
 
 const DEFAULT_PROGRAM = `LABEL Bell Pair
 INIT q0
@@ -250,6 +253,16 @@ export function WorkspacePage() {
   const circuitGates = useCircuitStore((state) => state.gates)
   const circuitInitialStates = useCircuitStore((state) => state.initialStates)
 
+  const preflightOpen         = useSimStore((s) => s.preflightOpen)
+  const setPreflightOpen      = useSimStore((s) => s.setPreflightOpen)
+  const setSystemHardware     = useSimStore((s) => s.setSystemHardware)
+  const walkthroughOpen       = useSimStore((s) => s.walkthroughOpen)
+  const setWalkthroughOpen    = useSimStore((s) => s.setWalkthroughOpen)
+  const walkthroughStep       = useSimStore((s) => s.walkthroughStep)
+  const setWalkthroughStep    = useSimStore((s) => s.setWalkthroughStep)
+  const openForWalkthrough    = useSimStore((s) => s.openForWalkthrough)
+  const setOpenForWalkthrough = useSimStore((s) => s.setOpenForWalkthrough)
+
   const selectionOptions = useMemo<WorkspaceModelOption[]>(() => {
     const templateOptions = (catalog?.templates ?? []).map((template) => ({
       value: `template:${template.id}`,
@@ -328,7 +341,18 @@ export function WorkspacePage() {
       }
     }
 
+    // Non-blocking: detect host hardware for the pre-flight modal
+    async function detectHardware() {
+      try {
+        const result = await runWorkspaceBenchmarks([])
+        if (active) setSystemHardware(result.capabilities)
+      } catch {
+        // Silently ignore – hardware panel falls back to placeholder labels
+      }
+    }
+
     loadCatalog()
+    void detectHardware()
 
     return () => {
       active = false
@@ -403,12 +427,25 @@ export function WorkspacePage() {
     executionTokenRef.current = executionToken
     setRunning(true)
 
+    // Read execution config from store at call time
+    const { noiseModel: nm, computeTarget: ct } = useSimStore.getState()
+
     try {
-      const response = await simulateWorkspaceProgram(instructions)
+      const response = await simulateWorkspaceProgram(instructions, {
+        noiseModel: nm === 'ideal' ? undefined : nm,
+        preferGpu:  ct === 'gpu',
+      })
       if (executionToken !== executionTokenRef.current) return
       setSimulation(response)
       setRuntimeError(null)
       setActiveStep(Math.max(response.steps.length - 1, 0))
+      
+      // Auto-open walkthrough if requested via the Step button gatekeeper
+      if (openForWalkthrough) {
+        setWalkthroughStep(0)
+        setWalkthroughOpen(true)
+        setOpenForWalkthrough(false)
+      }
     } catch (error) {
       if (executionToken !== executionTokenRef.current) return
       setSimulation(null)
@@ -508,20 +545,33 @@ export function WorkspacePage() {
   }
 
   function applyTemplateById(templateId: string) {
+    // Fast path: option already in selectionOptions (catalog loaded)
     const option = selectionOptions.find((item) => item.value === `template:${templateId}`)
     if (option) {
       applySelection(option)
       setDrawerOpen(false)
+      return
     }
+    // Fallback: catalog may still be loading — load directly from the catalog map
+    const template = templateById.get(templateId)
+    if (template) {
+      setSource(template.code)
+      setDrawerOpen(false)
+    }
+    // If neither is available yet, delay close so the user can see the item is pending
   }
 
   function handleStepExecution() {
     if (!simulation || simulation.steps.length === 0) {
-      void handleRunWorkspace()
+      if (parsed.errors.length > 0 || parsed.instructions.length === 0) return
+      // Set the flag so Run immediately opens walkthrough, then open Run modal
+      setOpenForWalkthrough(true)
+      setPreflightOpen(true)
       return
     }
-    setActiveInspector("state")
-    setActiveStep((current) => Math.min(current + 1, simulation.steps.length - 1))
+    // Simulation exists: jump straight to Walkthrough Debugger
+    setWalkthroughStep(activeStep)
+    setWalkthroughOpen(true)
   }
 
   function handleResetExecution() {
@@ -563,7 +613,7 @@ export function WorkspacePage() {
             <button
               type="button"
               style={{ ...headerExecButtonStyle, borderColor: "var(--accent-green)", color: "var(--accent-green)" }}
-              onClick={() => void handleRunWorkspace()}
+              onClick={() => setPreflightOpen(true)}
               disabled={parsed.errors.length > 0 || parsed.instructions.length === 0 || running}
             >
               <Play size={14} />
@@ -712,6 +762,26 @@ export function WorkspacePage() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      <PreFlightModal
+        open={preflightOpen}
+        onOpenChange={(open) => {
+          setPreflightOpen(open)
+          if (!open) setOpenForWalkthrough(false) // clear flag if user cancels
+        }}
+        onConfirm={() => void handleRunWorkspace()}
+      />
+
+      {/* ── Step-by-Step Debugger modal ── */}
+      {simulation && (
+        <StepWalkthroughModal
+          open={walkthroughOpen}
+          onOpenChange={setWalkthroughOpen}
+          steps={simulation.steps}
+          currentStep={walkthroughStep}
+          onStepChange={setWalkthroughStep}
+        />
+      )}
 
       <div ref={containerRef} className="workspace-main" style={{ "--workspace-right-width": `${rightPaneWidth}px` } as CSSProperties}>
         <section className="workspace-pane workspace-left-pane">

@@ -27,10 +27,17 @@ export function fetchWorkspaceCatalog() {
   return request<WorkspaceCatalogResponse>("/api/workspace/catalog")
 }
 
-export function simulateWorkspaceProgram(instructions: WorkspaceInstruction[]) {
+export function simulateWorkspaceProgram(
+  instructions: WorkspaceInstruction[],
+  opts?: { noiseModel?: string; preferGpu?: boolean },
+) {
   return request<WorkspaceSimulationResponse>("/api/workspace/simulate", {
     method: "POST",
-    body: JSON.stringify({ instructions }),
+    body: JSON.stringify({
+      instructions,
+      ...(opts?.noiseModel   ? { noise_model: opts.noiseModel }   : {}),
+      ...(opts?.preferGpu    ? { prefer_gpu: opts.preferGpu }      : {}),
+    }),
   })
 }
 
