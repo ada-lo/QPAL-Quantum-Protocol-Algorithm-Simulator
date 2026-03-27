@@ -689,7 +689,13 @@ export function WorkspacePage() {
               <BenchmarksPanel benchmarks={benchmarks} benchmarking={benchmarking} onRun={handleRunBenchmarks} profiles={filteredBenchmarks} context={inspectorContext} />
             )}
             {activeInspector === "docs" && <DocsPanel syntax={catalog?.syntax ?? []} templates={filteredTemplates} notes={catalog?.architecture_notes ?? []} context={inspectorContext} />}
-            {activeInspector === "analysis" && <WorkspaceAnalysisPanel />}
+            {activeInspector === "analysis" && (
+              <WorkspaceAnalysisPanel
+                presetLabel={selectedModel?.title ?? null}
+                presetGates={selectedModel?.preset?.gates ?? null}
+                presetQubits={selectedModel?.preset?.nQubits ?? null}
+              />
+            )}
           </SectionCard>
         </aside>
       </div>
