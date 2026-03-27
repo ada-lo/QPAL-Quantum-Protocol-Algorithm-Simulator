@@ -5,6 +5,7 @@ from api.schemas.workspace import (
     WorkspaceCatalogResponse,
     WorkspaceSyntaxItem,
     WorkspaceTemplate,
+    WorkspaceTemplateParameter,
 )
 
 
@@ -276,8 +277,16 @@ TEMPLATES = [
         kind="algorithm",
         description="Recovers a hidden bit-string s from f(x)=s·x with a single quantum query.",
         tags=["bernstein-vazirani", "foundational", "oracle", "difficulty:beginner"],
+        parameters=[
+            WorkspaceTemplateParameter(
+                name="hidden_string",
+                label="Hidden Bit String",
+                type="string",
+                default="110",
+            )
+        ],
         code="\n".join([
-            "NOTE Bernstein-Vazirani — hidden string s=110",
+            "NOTE Bernstein-Vazirani — hidden string s={{hidden_string}}",
             "",
             "INIT q0",
             "INIT q1",
@@ -289,9 +298,8 @@ TEMPLATES = [
             "H q2",
             "H q3",
             "",
-            "LABEL Oracle encodes s=110: CNOT on q0 and q1",
-            "CNOT q0 q3",
-            "CNOT q1 q3",
+            "LABEL Oracle encodes s={{hidden_string}}",
+            "{{oracle_gates}}",
             "",
             "H q0",
             "H q1",
