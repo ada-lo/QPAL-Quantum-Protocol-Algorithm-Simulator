@@ -108,12 +108,20 @@ export interface WorkspaceSyntaxItem {
   expands_to?: string[] | null
 }
 
+export interface WorkspaceTemplateParameter {
+  name: string
+  label: string
+  type: string
+  default: any
+}
+
 export interface WorkspaceTemplate {
   id: string
   title: string
   kind: "protocol" | "algorithm" | "circuit" | "benchmark"
   description: string
   tags: string[]
+  parameters?: WorkspaceTemplateParameter[]
   code: string
 }
 

@@ -19,8 +19,14 @@ class WorkspaceInstruction(BaseModel):
 
 
 class WorkspaceSimulateRequest(BaseModel):
-    instructions: list[WorkspaceInstruction] = Field(default_factory=list)
+    # Dual-engine path (new): raw code + engine type
+    code: str = ""
+    engine: Literal["custom", "openqasm", "qunetsim"] = "custom"
+    noise_model: str | None = None
+    compute: str | None = None
     seed: int | None = None
+    # Legacy pseudocode path: structured instructions (used by executor.py & tests)
+    instructions: list[WorkspaceInstruction] = Field(default_factory=list)
 
 
 class MeasurementRecord(BaseModel):
@@ -104,12 +110,20 @@ class WorkspaceSyntaxItem(BaseModel):
     expands_to: list[str] | None = None
 
 
+class WorkspaceTemplateParameter(BaseModel):
+    name: str
+    label: str
+    type: str
+    default: Any
+
+
 class WorkspaceTemplate(BaseModel):
     id: str
     title: str
     kind: Literal["protocol", "algorithm", "circuit", "benchmark"]
     description: str
     tags: list[str] = Field(default_factory=list)
+    parameters: list[WorkspaceTemplateParameter] | None = None
     code: str
 
 

@@ -1,9 +1,10 @@
 import * as Accordion from "@radix-ui/react-accordion"
 import * as Dialog from "@radix-ui/react-dialog"
 import * as Tooltip from "@radix-ui/react-tooltip"
-import { BookOpenText, ChevronDown, CircleHelp, Cpu, Menu, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
+import { BookOpenText, ChevronDown, CircleHelp, Cpu, Info, Menu, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { Link } from "react-router-dom"
+import { Editor } from "@monaco-editor/react"
 
 import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
 import { LEARNING_EXPERIENCES, type LearningExperience } from "@/lib/quantum/learningCatalog"
@@ -25,11 +26,12 @@ import type { CircuitGate } from "@/store/circuitStore"
 import { useCircuitStore } from "@/store/circuitStore"
 import { useLearningStore } from "@/store/learningStore"
 import { useSimStore } from "@/store/simStore"
-import { BlochInspector, DocsPanel, StateInspector } from "./WorkspaceInspectors"
+import { AlgorithmSettingsPanel, BlochInspector, DocsPanel, StateInspector } from "./WorkspaceInspectors"
 import WorkspaceAnalysisPanel from "./WorkspaceAnalysisPanel"
 import { WorkspaceCircuitBuilder } from "./WorkspaceCircuitBuilder"
 import { PreFlightModal } from "./PreFlightModal"
 import { StepWalkthroughModal } from "./StepWalkthroughModal"
+import { DocumentationModal } from "./DocumentationModal"
 
 const DEFAULT_PROGRAM = `LABEL Bell Pair
 INIT q0
@@ -236,6 +238,7 @@ export function WorkspacePage() {
   const [catalog, setCatalog] = useState<WorkspaceCatalogResponse | null>(null)
   const [simulation, setSimulation] = useState<WorkspaceSimulationResponse | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
+  const [validationFailed, setValidationFailed] = useState(false)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [benchmarks, setBenchmarks] = useState<WorkspaceBenchmarkResponse | null>(null)
@@ -243,6 +246,7 @@ export function WorkspacePage() {
   const [activeStep, setActiveStep] = useState(0)
   const [activeInspector, setActiveInspector] = useState<InspectorTab>("studio")
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [docsOpen, setDocsOpen] = useState(false)
   const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false)
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
   const [rightPaneWidth, setRightPaneWidth] = useState(430)
@@ -269,6 +273,9 @@ export function WorkspacePage() {
   const setWalkthroughStep    = useSimStore((s) => s.setWalkthroughStep)
   const openForWalkthrough    = useSimStore((s) => s.openForWalkthrough)
   const setOpenForWalkthrough = useSimStore((s) => s.setOpenForWalkthrough)
+  const loadTemplate          = useSimStore((s) => s.loadTemplate)
+  const engine                = useSimStore((s) => s.engine)
+  const setEngine             = useSimStore((s) => s.setEngine)
 
   const selectionOptions = useMemo<WorkspaceModelOption[]>(() => {
     const templateOptions = (catalog?.templates ?? []).map((template) => ({
@@ -373,14 +380,14 @@ export function WorkspacePage() {
   }, [selectionOptions, selectedModelValue])
 
   useEffect(() => {
-    if (parsed.errors.length > 0 || parsed.instructions.length === 0) {
+    if (!source.trim()) {
       setSimulation(null)
       setRuntimeError(null)
       return
     }
 
     const timer = window.setTimeout(async () => {
-      await executeProgram(parsed.instructions)
+      await executeProgram(source)
     }, 350)
 
     return () => window.clearTimeout(timer)
@@ -429,16 +436,16 @@ export function WorkspacePage() {
     setSource((prev) => (nextSource !== prev ? nextSource : prev))
   }, [circuitQubitCount, circuitGates, circuitInitialStates])
 
-  async function executeProgram(instructions: WorkspaceInstruction[]) {
+  async function executeProgram(code: string) {
     const executionToken = executionTokenRef.current + 1
     executionTokenRef.current = executionToken
     setRunning(true)
 
     // Read execution config from store at call time
-    const { noiseModel: nm, computeTarget: ct } = useSimStore.getState()
+    const { noiseModel: nm, computeTarget: ct, engine } = useSimStore.getState()
 
     try {
-      const response = await simulateWorkspaceProgram(instructions, {
+      const response = await simulateWorkspaceProgram(code, engine, {
         noiseModel: nm === 'ideal' ? undefined : nm,
         preferGpu:  ct === 'gpu',
       })
@@ -466,12 +473,24 @@ export function WorkspacePage() {
 
   async function handleRunWorkspace() {
     setActiveInspector("state")
-    if (parsed.errors.length > 0 || parsed.instructions.length === 0) {
-      setRuntimeError("Fix the pseudocode errors before running the backend.")
+    setValidationFailed(false)
+    setRuntimeError(null)
+
+    if (!source.trim()) {
+      setRuntimeError("Code cannot be empty.")
       return
     }
 
-    await executeProgram(parsed.instructions)
+    const { templateParams } = useSimStore.getState()
+    const hasEmptyParams = Object.values(templateParams).some((v) => v === "" || v === null || v === undefined)
+    
+    if (hasEmptyParams || source.includes("{{")) {
+      setValidationFailed(true)
+      setRuntimeError("Error: Please provide valid inputs for all template parameters.")
+      return
+    }
+
+    await executeProgram(source)
   }
 
   async function handleRunBenchmarks() {
@@ -498,14 +517,16 @@ export function WorkspacePage() {
       setActiveInspector("state")
     }
 
-    if (option.source === "template" && option.code) {
-      setSource(option.code)
+    if (option.source === "template" && option.template) {
+      const hydrated = loadTemplate(option.template)
+      setSource(hydrated)
       return
     }
 
     const templateMatch = findRelatedTemplate(option, catalog?.templates ?? [])
     if (templateMatch) {
-      setSource(templateMatch.code)
+      const hydrated = loadTemplate(templateMatch)
+      setSource(hydrated)
       return
     }
 
@@ -564,22 +585,36 @@ export function WorkspacePage() {
     // Fallback: catalog may still be loading — load directly from the catalog map
     const template = templateById.get(templateId)
     if (template) {
-      setSource(template.code)
+      const hydrated = loadTemplate(template)
+      setSource(hydrated)
       setDrawerOpen(false)
     }
     // If neither is available yet, delay close so the user can see the item is pending
   }
 
   function handleStepExecution() {
+    setValidationFailed(false)
+    setRuntimeError(null)
+
+    if (!source.trim()) return
+
+    const { templateParams } = useSimStore.getState()
+    const hasEmptyParams = Object.values(templateParams).some((v) => v === "" || v === null || v === undefined)
+    
+    if (hasEmptyParams || source.includes("{{")) {
+      setValidationFailed(true)
+      setRuntimeError("Error: Please provide valid inputs for all template parameters.")
+      return
+    }
+
     if (!simulation || simulation.steps.length === 0) {
-      if (parsed.errors.length > 0 || parsed.instructions.length === 0) return
       // Set the flag so Run immediately opens walkthrough, then open Run modal
       setOpenForWalkthrough(true)
       setPreflightOpen(true)
       return
     }
-    // Simulation exists: jump straight to Walkthrough Debugger
-    setWalkthroughStep(activeStep)
+    // Simulation exists: jump straight to Walkthrough Debugger, starting at step 0
+    setWalkthroughStep(0)
     setWalkthroughOpen(true)
   }
 
@@ -623,7 +658,7 @@ export function WorkspacePage() {
               type="button"
               style={{ ...headerExecButtonStyle, borderColor: "var(--accent-green)", color: "var(--accent-green)" }}
               onClick={() => setPreflightOpen(true)}
-              disabled={parsed.errors.length > 0 || parsed.instructions.length === 0 || running}
+              disabled={!source.trim() || running}
             >
               <Play size={14} />
               {running ? "Running" : "Run All"}
@@ -691,10 +726,17 @@ export function WorkspacePage() {
             </Accordion.Root>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Link to="/docs" style={drawerActionLinkStyle} onClick={() => setDrawerOpen(false)}>
+              <button
+                type="button"
+                style={drawerActionLinkStyle}
+                onClick={() => {
+                  setDrawerOpen(false)
+                  setDocsOpen(true)
+                }}
+              >
                 <BookOpenText size={14} />
                 Open docs page
-              </Link>
+              </button>
               <button
                 type="button"
                 style={drawerActionButtonStyle}
@@ -779,6 +821,7 @@ export function WorkspacePage() {
           if (!open) setOpenForWalkthrough(false) // clear flag if user cancels
         }}
         onConfirm={() => void handleRunWorkspace()}
+        source={source}
       />
 
       {/* ── Step-by-Step Debugger modal ── */}
@@ -789,8 +832,14 @@ export function WorkspacePage() {
           steps={simulation.steps}
           currentStep={walkthroughStep}
           onStepChange={setWalkthroughStep}
+          onFinish={() => {
+            setWalkthroughOpen(false)
+            setActiveInspector("state")
+          }}
         />
       )}
+
+      <DocumentationModal open={docsOpen} onOpenChange={setDocsOpen} templates={catalog?.templates ?? []} />
 
       <div ref={containerRef} className="workspace-main" style={{ "--workspace-right-width": `${rightPaneWidth}px` } as CSSProperties}>
         <section className="workspace-pane workspace-left-pane">
@@ -801,11 +850,25 @@ export function WorkspacePage() {
                 <WorkspaceCircuitBuilder canSync={parsed.instructions.length > 0} />
               </div>
               <div style={terminalPaneStyle}>
-                <div style={terminalHeaderStyle}>
-                  <span style={terminalDotStyle} />
-                  <span style={terminalDotStyle} />
-                  <span style={terminalDotStyle} />
-                  <span style={{ marginLeft: 8, color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>parser terminal</span>
+                <div style={editorHeaderStyle}>
+                  <select
+                    value={engine}
+                    onChange={(event) => setEngine(event.target.value as "custom" | "openqasm" | "qunetsim")}
+                    style={engineSelectStyle}
+                    aria-label="Execution engine"
+                  >
+                    <option value="custom">QPAL Parser</option>
+                    <option value="openqasm">OpenQASM 3.0</option>
+                    <option value="qunetsim">QuNetSim</option>
+                  </select>
+                  <div style={editorHeaderIconsStyle}>
+                    <button type="button" aria-label="Editor info" style={editorHeaderIconButtonStyle}>
+                      <Info size={14} />
+                    </button>
+                    <button type="button" aria-label="Editor options" style={editorHeaderIconButtonStyle}>
+                      <MoreHorizontal size={14} />
+                    </button>
+                  </div>
                 </div>
                 <div style={syntaxChipRailStyle}>
                   {QUICK_SYNTAX.map((line) => (
@@ -814,7 +877,16 @@ export function WorkspacePage() {
                     </button>
                   ))}
                 </div>
-                <textarea value={source} onChange={(event) => setSource(event.target.value)} spellCheck={false} style={editorStyle} />
+                <div style={{ borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid #2a3248" }}>
+                  <Editor 
+                    height="220px" 
+                    language={engine === "qunetsim" ? "python" : engine === "openqasm" ? "c" : "plaintext"} 
+                    theme={theme === "dark" ? "vs-dark" : "light"}
+                    value={source} 
+                    onChange={(val) => setSource(val ?? "")}
+                    options={{ minimap: { enabled: false }, fontSize: 13, fontFamily: "var(--font-mono)", padding: { top: 12 }, scrollBeyondLastLine: false }}
+                  />
+                </div>
 
                 {(runtimeError || catalogError || simulation?.warnings.length) && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
@@ -843,6 +915,8 @@ export function WorkspacePage() {
         <div className="workspace-resizer" onPointerDown={handleResizeStart} title="Resize inspector" />
 
         <aside className="workspace-pane workspace-right-pane" style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <AlgorithmSettingsPanel onUpdateSource={setSource} validationFailed={validationFailed} />
+          
           <SectionCard
             title="Inspector"
             subtitle="Inspect state, Bloch vectors, analysis, and model-specific docs from here."
@@ -1340,20 +1414,46 @@ const terminalPaneStyle: CSSProperties = {
   minHeight: 260,
 }
 
-const terminalHeaderStyle: CSSProperties = {
+const editorHeaderStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 6,
+  justifyContent: "space-between",
+  gap: 10,
   marginBottom: 10,
-  paddingBottom: 8,
-  borderBottom: "1px solid #232b3d",
+  padding: "6px 8px",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid #2a3248",
+  background: "#0c111d",
 }
 
-const terminalDotStyle: CSSProperties = {
-  width: 9,
-  height: 9,
-  borderRadius: 999,
-  background: "#4a556f",
+const engineSelectStyle: CSSProperties = {
+  minWidth: 180,
+  maxWidth: 240,
+  borderRadius: "var(--radius-sm)",
+  border: "1px solid #2f3a53",
+  background: "#171d2c",
+  color: "#d4def4",
+  padding: "6px 10px",
+  fontSize: 12,
+  fontFamily: "var(--font-mono)",
+}
+
+const editorHeaderIconsStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+}
+
+const editorHeaderIconButtonStyle: CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: "var(--radius-sm)",
+  border: "1px solid #2f3a53",
+  background: "#171d2c",
+  color: "#a5b4d6",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
 }
 
 const syntaxChipRailStyle: CSSProperties = {

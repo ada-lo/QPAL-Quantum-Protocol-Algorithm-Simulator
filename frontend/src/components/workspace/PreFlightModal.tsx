@@ -1,5 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog"
-import { AlertTriangle, CheckCircle2, Cpu, Zap } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Cpu, Loader2, Zap } from "lucide-react"
 import type { CSSProperties } from "react"
 import { useCircuitStore } from "@/store/circuitStore"
 import { useSimStore, type ComputeTarget, type NoiseModel } from "@/store/simStore"
@@ -10,6 +10,8 @@ interface PreFlightModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
+  /** The current editor source code to simulate */
+  source?: string
 }
 
 // ── Noise model options ───────────────────────────────────────────────────────
@@ -37,13 +39,15 @@ function complexityScore(qubits: number, depth: number, gateCount: number): numb
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function PreFlightModal({ open, onOpenChange, onConfirm }: PreFlightModalProps) {
+export function PreFlightModal({ open, onOpenChange, onConfirm, source }: PreFlightModalProps) {
   // Store reads
-  const noiseModel      = useSimStore((s) => s.noiseModel)
-  const computeTarget   = useSimStore((s) => s.computeTarget)
-  const systemHardware  = useSimStore((s) => s.systemHardware)
-  const setNoiseModel   = useSimStore((s) => s.setNoiseModel)
+  const noiseModel       = useSimStore((s) => s.noiseModel)
+  const computeTarget    = useSimStore((s) => s.computeTarget)
+  const systemHardware   = useSimStore((s) => s.systemHardware)
+  const loading          = useSimStore((s) => s.loading)
+  const setNoiseModel    = useSimStore((s) => s.setNoiseModel)
   const setComputeTarget = useSimStore((s) => s.setComputeTarget)
+  const runSimulation    = useSimStore((s) => s.runSimulation)
 
   const nQubits   = useCircuitStore((s) => s.nQubits)
   const gates     = useCircuitStore((s) => s.gates)
@@ -68,9 +72,15 @@ export function PreFlightModal({ open, onOpenChange, onConfirm }: PreFlightModal
     ? `GPU: ${systemHardware?.gpu_name ?? "Detected"}`
     : "GPU"
 
-  function handleConfirm() {
+  async function handleConfirm() {
     onOpenChange(false)
-    onConfirm()
+    if (source) {
+      // Dual-engine path: fire actual API call via the store
+      await runSimulation(source)
+    } else {
+      // Legacy path: delegate to WorkspacePage's handler
+      onConfirm()
+    }
   }
 
   return (
@@ -222,9 +232,11 @@ export function PreFlightModal({ open, onOpenChange, onConfirm }: PreFlightModal
               </button>
             </Dialog.Close>
 
-            <button type="button" style={runButtonStyle} onClick={handleConfirm}>
-              <CheckCircle2 size={15} />
-              Run Simulation
+            <button type="button" style={runButtonStyle} onClick={() => void handleConfirm()} disabled={loading}>
+              {loading
+                ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} />
+                : <CheckCircle2 size={15} />}
+              {loading ? "Running…" : "Run Simulation"}
             </button>
           </div>
 

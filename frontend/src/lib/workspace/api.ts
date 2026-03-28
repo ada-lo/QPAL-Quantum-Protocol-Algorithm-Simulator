@@ -1,7 +1,6 @@
 import type {
   WorkspaceBenchmarkResponse,
   WorkspaceCatalogResponse,
-  WorkspaceInstruction,
   WorkspaceSimulationResponse,
 } from "./types"
 
@@ -28,13 +27,15 @@ export function fetchWorkspaceCatalog() {
 }
 
 export function simulateWorkspaceProgram(
-  instructions: WorkspaceInstruction[],
+  code: string,
+  engine: string,
   opts?: { noiseModel?: string; preferGpu?: boolean },
 ) {
   return request<WorkspaceSimulationResponse>("/api/workspace/simulate", {
     method: "POST",
     body: JSON.stringify({
-      instructions,
+      code,
+      engine,
       ...(opts?.noiseModel   ? { noise_model: opts.noiseModel }   : {}),
       ...(opts?.preferGpu    ? { prefer_gpu: opts.preferGpu }      : {}),
     }),

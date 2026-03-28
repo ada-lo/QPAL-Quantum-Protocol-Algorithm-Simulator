@@ -23,3 +23,7 @@ python-dotenv>=1.0.0
 # All optional — the backend starts and runs fully without them.
 # If a package is missing, that analysis engine gracefully returns
 # a fallback result or a clear "not installed" message.
+
+# ── Dev/Test ─────────────────────────────────────────────────────
+pytest>=7.0
+requests>=2.28

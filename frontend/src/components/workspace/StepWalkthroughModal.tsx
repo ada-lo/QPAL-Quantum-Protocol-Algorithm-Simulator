@@ -2,9 +2,10 @@ import * as Dialog from "@radix-ui/react-dialog"
 import { Suspense, type CSSProperties } from "react"
 import { Canvas } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
-import { ChevronLeft, ChevronRight, Terminal, Layers, Activity } from "lucide-react"
+import { ChevronLeft, ChevronRight, Terminal, Layers, Activity, CheckCircle2 } from "lucide-react"
 
 import { BlochScene } from "@/components/bloch/BlochScene"
+import { useSimStore } from "@/store/simStore"
 import type { WorkspaceExecutionStep } from "@/lib/workspace/types"
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -15,6 +16,50 @@ interface StepWalkthroughModalProps {
   steps: WorkspaceExecutionStep[]
   currentStep: number
   onStepChange: (step: number) => void
+  onFinish?: () => void
+}
+
+// ── Educational Helpers ───────────────────────────────────────────────────────
+
+function derivePedagogicalWhat(opcode: string): string {
+  const upper = opcode.toUpperCase()
+  if (upper === "H") return "Applies a Hadamard (H) Gate to create an equal superposition of |0⟩ and |1⟩."
+  if (upper === "X") return "Applies a Pauli-X (NOT) Gate to flip the qubit state between |0⟩ and |1⟩."
+  if (upper === "Z") return "Applies a Pauli-Z Gate to flip the phase of the qubit."
+  if (upper === "Y") return "Applies a Pauli-Y Gate, combining a bit flip and a phase flip."
+  if (["CNOT", "CX"].includes(upper)) return "Applies a Controlled-NOT Gate. It flips the target qubit only if the control qubit is |1⟩."
+  if (["CZ"].includes(upper)) return "Applies a Controlled-Z Gate. It applies a phase flip to the target if the control is |1⟩."
+  if (upper === "SWAP") return "Swaps the states of two qubits."
+  if (upper === "MEASURE") return "Measures the qubit, collapsing its quantum state into a classical bit (0 or 1)."
+  if (upper === "INIT") return "Initializes the qubit to a well-defined starting state (usually |0⟩)."
+  return `Executes the ${upper} instruction.`
+}
+
+function derivePedagogicalWhy(templateId: string | undefined, opcode: string, stepIndex: number): string {
+  const upper = opcode.toUpperCase()
+  if (!templateId) return "This operation manipulates the qubit state to advance the quantum circuit calculation."
+  
+  if (templateId === "bernstein_vazirani" || templateId === "deutsch_jozsa") {
+    if (upper === "H" && stepIndex < 5) return "We apply H gates at the beginning to evaluate all possible input combinations simultaneously (quantum parallelism)."
+    if (upper === "H") return "We apply H gates at the end to interfere the computation paths, isolating the correct classical answer."
+    if (upper === "X") return "We flip the ancilla qubit to |1⟩ so that the subsequent phase kickback from the oracle works correctly."
+    if (upper === "CNOT" || upper === "CX") return "The oracle uses CNOTs to entangle the inputs with the ancilla, encoding the hidden function without measuring."
+  }
+  
+  if (templateId === "bb84" || templateId === "e91_qkd") {
+    if (upper === "H") return "H gates randomly change the measurement basis between the standard (Z) and diagonal (X) basis, ensuring cryptographic security."
+    if (upper === "SEND") return "The photon is transmitted over the quantum channel to the receiver."
+    if (upper === "MEASURE") return "The receiver attempts to measure the photon in a randomly chosen basis."
+    if (upper === "INTERCEPT") return "An eavesdropper is measuring the transit photon, which inherently collapses its state and introduces detectable errors."
+  }
+  
+  if (templateId === "quantum_teleportation") {
+    if (upper === "H" || upper === "CNOT" || upper === "CX") return "Creates entanglement (a Bell state) that acts as a quantum bridge between Alice and Bob."
+    if (upper === "MEASURE") return "Alice measures her qubits, destroying the original state but generating classical bits needed for reconstruction."
+    if (upper === "X" || upper === "Z") return "Bob applies corrections based on Alice's classical message, perfectly reconstructing the teleported state."
+  }
+
+  return "This operation manipulates the qubit state to advance the algorithm."
 }
 
 // ── Gate category labels ──────────────────────────────────────────────────────
@@ -47,7 +92,10 @@ export function StepWalkthroughModal({
   steps,
   currentStep,
   onStepChange,
+  onFinish,
 }: StepWalkthroughModalProps) {
+  const activeTemplate = useSimStore((s) => s.activeTemplate)
+
   if (steps.length === 0) return null
 
   const clampedStep = Math.max(0, Math.min(currentStep, steps.length - 1))
@@ -74,14 +122,31 @@ export function StepWalkthroughModal({
             {/* ─ Top eyebrow ─ */}
             <div style={leftHeaderStyle}>
               <div style={eyebrowStyle}>STEP WALKTHROUGH DEBUGGER</div>
-              <div style={stepCounterStyle}>
-                Step <span style={{ color: "var(--accent-cyan)", fontVariantNumeric: "tabular-nums" }}>{clampedStep + 1}</span>
-                &nbsp;of&nbsp;
-                <span style={{ color: "var(--text-secondary)" }}>{total}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Dialog.Title style={{ fontSize: 20, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
+                  Execution Step
+                </Dialog.Title>
+                <div style={stepCounterStyle}>
+                  <span style={{ color: "var(--accent-cyan)", fontVariantNumeric: "tabular-nums", fontSize: 16 }}>{clampedStep + 1}</span>
+                  <span style={{ color: "var(--text-secondary)", fontSize: 13 }}> / {total}</span>
+                </div>
               </div>
-              <Dialog.Title style={{ fontSize: 20, fontWeight: 700, margin: 0, lineHeight: 1.2 }}>
-                {step.event}
-              </Dialog.Title>
+
+              {/* WHAT, HOW, WHY Cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                <div style={{ ...whwCardStyle, background: "rgba(0, 212, 255, 0.08)", borderLeftColor: "var(--accent-cyan)" }}>
+                  <div style={{ ...whwLabelStyle, color: "var(--accent-cyan)" }}>WHAT</div>
+                  <div style={whwTextStyle}>{derivePedagogicalWhat(step.instruction.opcode)}</div>
+                </div>
+                <div style={{ ...whwCardStyle, background: "rgba(74, 222, 128, 0.08)", borderLeftColor: "var(--accent-green)" }}>
+                  <div style={{ ...whwLabelStyle, color: "var(--accent-green)" }}>HOW</div>
+                  <div style={whwTextStyle}>{step.event}</div>
+                </div>
+                <div style={{ ...whwCardStyle, background: "rgba(167, 139, 250, 0.08)", borderLeftColor: "#a78bfa" }}>
+                  <div style={{ ...whwLabelStyle, color: "#a78bfa" }}>WHY</div>
+                  <div style={whwTextStyle}>{derivePedagogicalWhy(activeTemplate?.id, step.instruction.opcode, clampedStep)}</div>
+                </div>
+              </div>
             </div>
 
             {/* ─ Divider ─ */}
@@ -184,15 +249,25 @@ export function StepWalkthroughModal({
                 })}
               </div>
 
-              <button
-                type="button"
-                style={{ ...navButtonStyle, opacity: isLast ? 0.35 : 1, cursor: isLast ? "not-allowed" : "pointer", color: "var(--accent-cyan)" }}
-                disabled={isLast}
-                onClick={() => onStepChange(clampedStep + 1)}
-              >
-                Next
-                <ChevronRight size={17} />
-              </button>
+              {isLast ? (
+                <button
+                  type="button"
+                  style={{ ...navButtonStyle, background: "var(--accent-cyan)", color: "var(--bg-panel)", border: "none" }}
+                  onClick={() => (onFinish ? onFinish() : onOpenChange(false))}
+                >
+                  Finish & View Output
+                  <CheckCircle2 size={17} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  style={{ ...navButtonStyle, color: "var(--accent-cyan)" }}
+                  onClick={() => onStepChange(clampedStep + 1)}
+                >
+                  Next
+                  <ChevronRight size={17} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -427,6 +502,25 @@ const navFooterStyle: CSSProperties = {
   background: "var(--bg-panel)",
   gap: 12,
   marginTop: 12,
+}
+
+const whwCardStyle: CSSProperties = {
+  padding: "12px 16px",
+  borderRadius: "var(--radius-md, 8px)",
+  borderLeft: "4px solid transparent",
+}
+
+const whwLabelStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: "0.1em",
+  marginBottom: 4,
+}
+
+const whwTextStyle: CSSProperties = {
+  fontSize: 13,
+  lineHeight: 1.5,
+  color: "var(--text-primary)",
 }
 
 const navButtonStyle: CSSProperties = {
