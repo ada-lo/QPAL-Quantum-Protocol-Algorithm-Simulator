@@ -17,6 +17,8 @@
  *   const qasm = engine.toQASM()
  */
 
+// quantum-circuit may not ship type declarations
+// @ts-ignore — suppress if no .d.ts found
 import QuantumCircuit from 'quantum-circuit'
 
 export interface QCStatevector {

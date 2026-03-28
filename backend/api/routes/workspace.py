@@ -11,7 +11,10 @@ from api.schemas.workspace import (
     WorkspaceSimulateRequest,
     WorkspaceSimulateResponse,
 )
-from core.workspace import get_workspace_catalog, run_analysis, run_benchmarks, simulate_workspace
+from core.workspace import get_workspace_catalog, run_analysis, run_benchmarks
+from core.workspace.executor import simulate_workspace
+from core.workspace.parser import parse_pseudocode
+from core.engines import execute_qasm, execute_qunetsim
 
 router = APIRouter(prefix="/workspace", tags=["workspace"])
 
@@ -23,7 +26,16 @@ async def workspace_catalog() -> WorkspaceCatalogResponse:
 
 @router.post("/simulate", response_model=WorkspaceSimulateResponse)
 async def workspace_simulate(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
-    return simulate_workspace(req)
+    if req.engine == "custom":
+        # Parse QPAL pseudocode into structured instructions, then execute
+        instructions = parse_pseudocode(req.code)
+        req.instructions = instructions
+        return simulate_workspace(req)
+    elif req.engine == "openqasm":
+        return execute_qasm(req)
+    else:
+        return execute_qunetsim(req)
+
 
 
 @router.post("/benchmarks", response_model=WorkspaceBenchmarkResponse)

@@ -1,4 +1,4 @@
-import { Cpu, RefreshCw } from "lucide-react"
+import { Cpu, RefreshCw, Settings2 } from "lucide-react"
 import type { CSSProperties } from "react"
 
 import type {
@@ -9,11 +9,77 @@ import type {
   WorkspaceTemplate,
 } from "@/lib/workspace/types"
 import { WorkspaceBlochPanel } from "./WorkspaceBlochPanel"
+import { useSimStore } from "@/store/simStore"
 
 export interface WorkspaceInspectorContext {
   title: string
   description: string
   kind: string
+}
+
+export function AlgorithmSettingsPanel({
+  onUpdateSource,
+  validationFailed,
+}: {
+  onUpdateSource: (code: string) => void
+  validationFailed?: boolean
+}) {
+  const activeTemplate = useSimStore((s) => s.activeTemplate)
+  const templateParams = useSimStore((s) => s.templateParams)
+  const updateParameter = useSimStore((s) => s.updateParameter)
+
+  if (!activeTemplate?.parameters || activeTemplate.parameters.length === 0) return null
+
+  return (
+    <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <Settings2 size={16} color="var(--accent-cyan)" />
+        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "var(--accent-cyan)", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
+          Algorithm Settings
+        </span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+        {activeTemplate.parameters.map((param) => (
+          <div key={param.name} style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 200, flex: 1 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+              {param.label}
+            </label>
+            <input
+              type={param.type === "number" ? "number" : "text"}
+              value={templateParams[param.name] ?? param.default}
+              onChange={(e) => {
+                const val = param.type === "number" ? Number(e.target.value) : e.target.value
+                const hydratedCode = updateParameter(param.name, val)
+                if (hydratedCode) onUpdateSource(hydratedCode)
+              }}
+              style={{
+                background: "var(--bg-surface)", 
+                border: "1px solid",
+                borderColor: validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
+                  ? "var(--accent-red)"
+                  : "var(--border)",
+                borderRadius: "var(--radius-md)", padding: "10px 14px", 
+                color: "var(--text-primary)", fontSize: 13, fontFamily: "var(--font-mono)",
+                transition: "border-color 0.15s, box-shadow 0.15s"
+              }}
+              onFocus={(e) => {
+                const hasError = validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
+                e.target.style.borderColor = hasError ? "var(--accent-red)" : "var(--accent-cyan)"
+                e.target.style.boxShadow = hasError
+                  ? "0 0 0 2px rgba(248, 113, 113, 0.15)"
+                  : "var(--ring-cyan)"
+              }}
+              onBlur={(e) => {
+                const hasError = validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
+                e.target.style.borderColor = hasError ? "var(--accent-red)" : "var(--border)"
+                e.target.style.boxShadow = "none"
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export function StateInspector({
@@ -94,6 +160,8 @@ export function StateInspector({
         <div style={eyebrowStyle}>Instruction Objects</div>
         <pre style={jsonStyle}>{JSON.stringify(instructions, null, 2)}</pre>
       </div>
+
+      <SimulationOutputPanel />
     </div>
   )
 }
@@ -332,4 +400,64 @@ const eyebrowStyle: CSSProperties = {
   color: "var(--text-muted)",
   letterSpacing: "0.08em",
   marginBottom: 8,
+}
+
+// ── Simulation Output Panel ───────────────────────────────────────────────────
+
+export function SimulationOutputPanel() {
+  const result = useSimStore((s) => s.result)
+
+  if (!result) return null
+
+  const outcomeEntries = result.counts 
+    ? Object.entries(result.counts).sort((a, b) => b[1] - a[1])
+    : []
+
+  return (
+    <div style={{ padding: "16px 20px", marginTop: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "var(--accent-cyan)", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
+          Simulation Output
+        </span>
+      </div>
+      
+      <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+        <div style={{ flex: 1, padding: "12px 14px", borderRadius: "8px", background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", letterSpacing: "0.06em", marginBottom: 4, fontWeight: 600 }}>FIDELITY</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--accent-cyan)", fontFamily: "var(--font-mono)" }}>
+            {(result.fidelity * 100).toFixed(1)}%
+          </div>
+        </div>
+        <div style={{ flex: 1, padding: "12px 14px", borderRadius: "8px", background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", letterSpacing: "0.06em", marginBottom: 4, fontWeight: 600 }}>SHOTS</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
+            {result.shots}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, color: "var(--text-muted)", letterSpacing: "0.06em", marginBottom: 12, fontWeight: 600 }}>MEASUREMENT COUNTS</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {outcomeEntries.length > 0 ? (
+          outcomeEntries.slice(0, 8).map(([bitstring, count]) => (
+            <div key={bitstring} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", width: 60 }}>
+                |{bitstring}⟩
+              </div>
+              <div style={{ flex: 1, height: 8, background: "rgba(0,0,0,0.2)", borderRadius: 999, overflow: "hidden", border: "1px solid var(--border)" }}>
+                <div style={{ height: "100%", width: `${(count / result.shots) * 100}%`, background: "var(--accent-cyan)", borderRadius: 999 }} />
+              </div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-secondary)", width: 40, textAlign: "right" }}>
+                {count}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center", padding: "12px 0", fontStyle: "italic" }}>
+            No measurements recorded.
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }

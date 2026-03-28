@@ -1,5 +1,10 @@
-import { RefreshCw, type LucideIcon } from "lucide-react"
+import * as Accordion from "@radix-ui/react-accordion"
+import * as Dialog from "@radix-ui/react-dialog"
+import * as Tooltip from "@radix-ui/react-tooltip"
+import { BookOpenText, ChevronDown, CircleHelp, Cpu, Info, Menu, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
+import { Link } from "react-router-dom"
+import { Editor } from "@monaco-editor/react"
 
 import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
 import { LEARNING_EXPERIENCES, type LearningExperience } from "@/lib/quantum/learningCatalog"
@@ -7,21 +12,26 @@ import { PRESETS, type CircuitPreset } from "@/lib/quantum/presets"
 import { fetchWorkspaceCatalog, runWorkspaceBenchmarks, simulateWorkspaceProgram } from "@/lib/workspace/api"
 import { circuitSnapshotToProgram } from "@/lib/workspace/circuitToProgram"
 import { parsePseudoProgram } from "@/lib/workspace/pseudoParser"
+import { programToCircuit } from "@/lib/workspace/programToCircuit"
 import type {
   WorkspaceBenchmarkProfile,
   WorkspaceBenchmarkResponse,
   WorkspaceCatalogResponse,
-  WorkspaceExecutionState,
   WorkspaceInstruction,
   WorkspaceParserIssue,
   WorkspaceSimulationResponse,
   WorkspaceTemplate,
 } from "@/lib/workspace/types"
+import type { CircuitGate } from "@/store/circuitStore"
 import { useCircuitStore } from "@/store/circuitStore"
 import { useLearningStore } from "@/store/learningStore"
-import { BenchmarksPanel, BlochInspector, DocsPanel, StateInspector } from "./WorkspaceInspectors"
+import { useSimStore } from "@/store/simStore"
+import { AlgorithmSettingsPanel, BlochInspector, DocsPanel, StateInspector } from "./WorkspaceInspectors"
 import WorkspaceAnalysisPanel from "./WorkspaceAnalysisPanel"
 import { WorkspaceCircuitBuilder } from "./WorkspaceCircuitBuilder"
+import { PreFlightModal } from "./PreFlightModal"
+import { StepWalkthroughModal } from "./StepWalkthroughModal"
+import { DocumentationModal } from "./DocumentationModal"
 
 const DEFAULT_PROGRAM = `LABEL Bell Pair
 INIT q0
@@ -36,30 +46,98 @@ const INSPECTOR_TABS = [
   { id: "studio", label: "Studio 3D" },
   { id: "state", label: "State" },
   { id: "bloch", label: "Bloch" },
-  { id: "benchmarks", label: "Benchmarks" },
   { id: "analysis", label: "Analysis" },
   { id: "docs", label: "Docs" },
 ] as const
-const WORKSPACE_VIEWS = [
-  { id: "circuit", label: "Circuit View" },
-  { id: "pseudocode", label: "Pseudocode Editor" },
-] as const
 const STUDIO_ALIASES: Record<string, string> = {
-  bell: "e91",
-  bell_pair: "e91",
-  ghz: "e91",
   bb84_eavesdrop: "bb84",
   teleportation_simplified: "teleport",
   superdense_simplified: "superdense",
   grover_starter: "grover",
+  grover_search: "grover",
   qft_signal: "qft",
+  qft_3qubit: "qft",
   qaoa_round: "qaoa",
+  qaoa_maxcut: "qaoa",
   qft3: "qft",
   superpos: "qwalk",
+  quantum_walk_1d: "qwalk",
+  vqe_h2: "vqe",
+  qpe_simple: "qpe",
+  shor_factorization: "shor",
+  deutsch_jozsa: "dj",
+  bernstein_vazirani: "bv",
+  qec_3qubit_repetition: "qec",
 }
 
+const DRAWER_TEMPLATE_GROUPS = [
+  {
+    id: "foundational",
+    label: "FOUNDATIONAL ALGORITHMS",
+    items: [
+      { id: "deutsch", label: "Deutsch Algorithm" },
+      { id: "deutsch_jozsa", label: "Deutsch-Jozsa Algorithm" },
+      { id: "bernstein_vazirani", label: "Bernstein-Vazirani Algorithm" },
+      { id: "simon", label: "Simon's Algorithm" },
+    ],
+  },
+  {
+    id: "communication_security",
+    label: "COMMUNICATION & SECURITY",
+    items: [
+      { id: "bell_pair", label: "Bell Pair Starter" },
+      { id: "bb84_eavesdrop", label: "BB84 With Eve" },
+      { id: "teleportation_simplified", label: "Teleportation Walkthrough" },
+      { id: "superdense_simplified", label: "Superdense Coding" },
+      { id: "n_qubit_teleportation", label: "N-Qubit Teleportation" },
+      { id: "veto_algorithm", label: "Veto Algorithm" },
+      { id: "qpc_socialist_millionaire", label: "QPC (Socialist Millionaire)" },
+    ],
+  },
+  {
+    id: "search_math",
+    label: "SEARCH & MATH",
+    items: [
+      { id: "grover_search", label: "Grover's Search" },
+      { id: "qft_3qubit", label: "Quantum Fourier Transform" },
+      { id: "qpe_simple", label: "Quantum Phase Estimation" },
+      { id: "shor_factorization", label: "Shor's Algorithm – Factorization" },
+      { id: "hhl_algorithm", label: "HHL Algorithm" },
+    ],
+  },
+  {
+    id: "qml",
+    label: "QUANTUM MACHINE LEARNING",
+    items: [
+      { id: "qsvm", label: "QSVM Algorithm" },
+      { id: "qkmean", label: "QKmean Algorithm" },
+      { id: "qknn", label: "QKNN Algorithm" },
+      { id: "qhc", label: "QHC Algorithm" },
+      { id: "qpca", label: "QPCA Algorithm" },
+      { id: "qperceptron", label: "QPerceptron Algorithm" },
+      { id: "qnn", label: "QNN Algorithm" },
+      { id: "qaoa_maxcut", label: "QAOA MaxCut" },
+    ],
+  },
+  {
+    id: "chemistry_simulation",
+    label: "CHEMISTRY & SIMULATION",
+    items: [
+      { id: "vqe_h2", label: "VQE Ansatz (H₂ molecule)" },
+      { id: "quantum_walk_1d", label: "Quantum Walk (1D)" },
+    ],
+  },
+  {
+    id: "error_correction",
+    label: "ERROR CORRECTION (QEC)",
+    items: [
+      { id: "qec_3qubit_repetition", label: "QEC: Three-Qubit Repetition Code" },
+      { id: "qec_shor_9qubit", label: "QEC: Shor's Nine-Qubit Code" },
+    ],
+  },
+] as const
+
 type InspectorTab = (typeof INSPECTOR_TABS)[number]["id"]
-type WorkspaceView = (typeof WORKSPACE_VIEWS)[number]["id"]
 type ThemeMode = "light" | "dark"
 
 interface WorkspaceModelOption {
@@ -139,25 +217,46 @@ function filterRelatedBenchmarks(option: WorkspaceModelOption | null, profiles: 
   return profiles
 }
 
+function gateSignature(gate: Omit<CircuitGate, "id">) {
+  return [
+    gate.gateId,
+    gate.qubit,
+    gate.step,
+    gate.targetQubit ?? "",
+    gate.controlQubit ?? "",
+    gate.angle ?? "",
+  ].join(":")
+}
+
+function circuitSignature(input: { nQubits: number; gates: Omit<CircuitGate, "id">[]; initialStates: readonly string[] }) {
+  const gateParts = input.gates.map(gateSignature).sort().join("|")
+  return `${input.nQubits}::${input.initialStates.join(",")}::${gateParts}`
+}
+
 export function WorkspacePage() {
   const [source, setSource] = useState(DEFAULT_PROGRAM)
   const [catalog, setCatalog] = useState<WorkspaceCatalogResponse | null>(null)
   const [simulation, setSimulation] = useState<WorkspaceSimulationResponse | null>(null)
   const [runtimeError, setRuntimeError] = useState<string | null>(null)
+  const [validationFailed, setValidationFailed] = useState(false)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const [benchmarks, setBenchmarks] = useState<WorkspaceBenchmarkResponse | null>(null)
   const [benchmarking, setBenchmarking] = useState(false)
   const [activeStep, setActiveStep] = useState(0)
   const [activeInspector, setActiveInspector] = useState<InspectorTab>("studio")
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<WorkspaceView>("pseudocode")
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false)
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
   const [presetPickerValue, setPresetPickerValue] = useState("")
   const [rightPaneWidth, setRightPaneWidth] = useState(430)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem("workspace-theme") === "dark" ? "dark" : "light"))
   const containerRef = useRef<HTMLDivElement | null>(null)
   const executionTokenRef = useRef(0)
-  const skipAutoExecuteRef = useRef(false)
+  // Sync guard: set to true while the parser is writing to the circuit store
+  // so the Visual→Text effect ignores that echo update.
+  const isParserWritingRef = useRef(false)
 
   const selectLearningExperience = useLearningStore((state) => state.select)
   const loadLearningCircuit = useLearningStore((state) => state.loadIntoCircuit)
@@ -165,6 +264,19 @@ export function WorkspacePage() {
   const circuitQubitCount = useCircuitStore((state) => state.nQubits)
   const circuitGates = useCircuitStore((state) => state.gates)
   const circuitInitialStates = useCircuitStore((state) => state.initialStates)
+
+  const preflightOpen         = useSimStore((s) => s.preflightOpen)
+  const setPreflightOpen      = useSimStore((s) => s.setPreflightOpen)
+  const setSystemHardware     = useSimStore((s) => s.setSystemHardware)
+  const walkthroughOpen       = useSimStore((s) => s.walkthroughOpen)
+  const setWalkthroughOpen    = useSimStore((s) => s.setWalkthroughOpen)
+  const walkthroughStep       = useSimStore((s) => s.walkthroughStep)
+  const setWalkthroughStep    = useSimStore((s) => s.setWalkthroughStep)
+  const openForWalkthrough    = useSimStore((s) => s.openForWalkthrough)
+  const setOpenForWalkthrough = useSimStore((s) => s.setOpenForWalkthrough)
+  const loadTemplate          = useSimStore((s) => s.loadTemplate)
+  const engine                = useSimStore((s) => s.engine)
+  const setEngine             = useSimStore((s) => s.setEngine)
 
   const selectionOptions = useMemo<WorkspaceModelOption[]>(() => {
     const templateOptions = (catalog?.templates ?? []).map((template) => ({
@@ -214,11 +326,13 @@ export function WorkspacePage() {
   const presetSelectionOptions = useMemo(() => selectionOptions.filter((option) => option.source === "preset" && option.preset), [selectionOptions])
   const filteredTemplates = useMemo(() => filterRelatedTemplates(selectedModel, catalog?.templates ?? []), [catalog?.templates, selectedModel])
   const filteredBenchmarks = useMemo(() => filterRelatedBenchmarks(selectedModel, catalog?.benchmarks ?? []), [catalog?.benchmarks, selectedModel])
+  const templateById = useMemo(() => {
+    const entries = (catalog?.templates ?? []).map((template) => [template.id, template] as const)
+    return new Map(entries)
+  }, [catalog?.templates])
   const parsed = useMemo(() => parsePseudoProgram(source), [source])
   const selectedStep = simulation?.steps[Math.min(activeStep, Math.max(simulation.steps.length - 1, 0))] ?? null
   const selectedState = selectedStep?.state ?? simulation?.final_state ?? null
-  const latestMeasurement = selectedState?.measurements[selectedState.measurements.length - 1] ?? null
-  const latestTransmission = selectedState?.transmissions[selectedState.transmissions.length - 1] ?? null
   const inspectorContext = selectedModel
     ? { title: selectedModel.title, description: selectedModel.description, kind: selectedModel.kindLabel }
     : null
@@ -243,7 +357,18 @@ export function WorkspacePage() {
       }
     }
 
+    // Non-blocking: detect host hardware for the pre-flight modal
+    async function detectHardware() {
+      try {
+        const result = await runWorkspaceBenchmarks([])
+        if (active) setSystemHardware(result.capabilities)
+      } catch {
+        // Silently ignore – hardware panel falls back to placeholder labels
+      }
+    }
+
     loadCatalog()
+    void detectHardware()
 
     return () => {
       active = false
@@ -257,34 +382,86 @@ export function WorkspacePage() {
   }, [selectionOptions, selectedModelValue])
 
   useEffect(() => {
-    if (parsed.errors.length > 0 || parsed.instructions.length === 0) {
+    if (!source.trim()) {
       setSimulation(null)
       setRuntimeError(null)
       return
     }
-    if (skipAutoExecuteRef.current) {
-      skipAutoExecuteRef.current = false
-      return
-    }
 
     const timer = window.setTimeout(async () => {
-      await executeProgram(parsed.instructions)
+      await executeProgram(source)
     }, 350)
 
     return () => window.clearTimeout(timer)
   }, [source])
 
-  async function executeProgram(instructions: WorkspaceInstruction[]) {
+  // Text → Visual: parse instructions and push to circuit store.
+  // Sets isParserWritingRef so the reverse effect doesn't echo back.
+  useEffect(() => {
+    if (parsed.instructions.length === 0) return
+    const snapshot = programToCircuit(parsed.instructions)
+    const nextSignature = circuitSignature({
+      nQubits: snapshot.nQubits,
+      gates: snapshot.gates,
+      initialStates: snapshot.initialStates,
+    })
+    const currentSignature = circuitSignature({
+      nQubits: circuitQubitCount,
+      gates: circuitGates.map((gate) => ({
+        gateId: gate.gateId,
+        qubit: gate.qubit,
+        step: gate.step,
+        targetQubit: gate.targetQubit,
+        controlQubit: gate.controlQubit,
+        angle: gate.angle,
+      })),
+      initialStates: circuitInitialStates,
+    })
+    if (nextSignature === currentSignature) return
+    isParserWritingRef.current = true
+    useCircuitStore.getState().replaceCircuit(snapshot.gates, snapshot.nQubits, snapshot.initialStates)
+    queueMicrotask(() => {
+      isParserWritingRef.current = false
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed.instructions])
+
+  // Visual → Text: when the user edits the circuit grid, regenerate pseudocode.
+  // Bails immediately if the parser was the one that just wrote the circuit.
+  useEffect(() => {
+    if (isParserWritingRef.current) return
+    const nextSource = circuitSnapshotToProgram({
+      nQubits: circuitQubitCount,
+      gates: circuitGates,
+      initialStates: circuitInitialStates,
+    })
+    setSource((prev) => (nextSource !== prev ? nextSource : prev))
+  }, [circuitQubitCount, circuitGates, circuitInitialStates])
+
+  async function executeProgram(code: string) {
     const executionToken = executionTokenRef.current + 1
     executionTokenRef.current = executionToken
     setRunning(true)
 
+    // Read execution config from store at call time
+    const { noiseModel: nm, computeTarget: ct, engine } = useSimStore.getState()
+
     try {
-      const response = await simulateWorkspaceProgram(instructions)
+      const response = await simulateWorkspaceProgram(code, engine, {
+        noiseModel: nm === 'ideal' ? undefined : nm,
+        preferGpu:  ct === 'gpu',
+      })
       if (executionToken !== executionTokenRef.current) return
       setSimulation(response)
       setRuntimeError(null)
       setActiveStep(Math.max(response.steps.length - 1, 0))
+      
+      // Auto-open walkthrough if requested via the Step button gatekeeper
+      if (openForWalkthrough) {
+        setWalkthroughStep(0)
+        setWalkthroughOpen(true)
+        setOpenForWalkthrough(false)
+      }
     } catch (error) {
       if (executionToken !== executionTokenRef.current) return
       setSimulation(null)
@@ -296,53 +473,35 @@ export function WorkspacePage() {
     }
   }
 
-  function setProgramWithoutAutoRun(nextSource: string) {
-    skipAutoExecuteRef.current = true
-    setSource(nextSource)
-  }
-
-  function syncSourceFromCircuit() {
-    const nextSource = circuitSnapshotToProgram({
-      nQubits: circuitQubitCount,
-      gates: circuitGates,
-      initialStates: circuitInitialStates,
-    })
-    setProgramWithoutAutoRun(nextSource)
-    return nextSource
-  }
-
-  function handleWorkspaceViewChange(nextView: WorkspaceView) {
-    setActiveWorkspaceView(nextView)
-  }
-
   async function handleRunWorkspace() {
     setActiveInspector("state")
-    if (activeWorkspaceView === "circuit") {
-      const nextSource = syncSourceFromCircuit()
-      const nextParsed = parsePseudoProgram(nextSource)
-      if (nextParsed.errors.length > 0 || nextParsed.instructions.length === 0) {
-        setRuntimeError("Circuit could not be converted into runnable pseudocode.")
-        setSimulation(null)
-        return
-      }
-      await executeProgram(nextParsed.instructions)
+    setValidationFailed(false)
+    setRuntimeError(null)
+
+    if (!source.trim()) {
+      setRuntimeError("Code cannot be empty.")
       return
     }
 
-    if (parsed.errors.length > 0 || parsed.instructions.length === 0) {
-      setRuntimeError("Fix the pseudocode errors before running the backend.")
+    const { templateParams } = useSimStore.getState()
+    const hasEmptyParams = Object.values(templateParams).some((v) => v === "" || v === null || v === undefined)
+    
+    if (hasEmptyParams || source.includes("{{")) {
+      setValidationFailed(true)
+      setRuntimeError("Error: Please provide valid inputs for all template parameters.")
       return
     }
 
-    await executeProgram(parsed.instructions)
+    await executeProgram(source)
   }
 
   async function handleRunBenchmarks() {
     try {
       setBenchmarking(true)
-      const response = await runWorkspaceBenchmarks(filteredBenchmarks.map((item) => item.id))
+      const benchmarkIds =
+        filteredBenchmarks.length > 0 ? filteredBenchmarks.map((item) => item.id) : (catalog?.benchmarks ?? []).map((item) => item.id)
+      const response = await runWorkspaceBenchmarks(benchmarkIds)
       setBenchmarks(response)
-      setActiveInspector("benchmarks")
     } catch (error) {
       setRuntimeError(error instanceof Error ? error.message : "Benchmark run failed.")
     } finally {
@@ -378,21 +537,24 @@ export function WorkspacePage() {
     }
 
     setSelectedModelValue(option.value)
-    setActiveInspector("studio")
-    setActiveWorkspaceView("pseudocode")
 
     if (option.studioId) {
       selectLearningExperience(option.studioId)
+      setActiveInspector("studio")
+    } else {
+      setActiveInspector("state")
     }
 
-    if (option.source === "template" && option.code) {
-      setSource(option.code)
+    if (option.source === "template" && option.template) {
+      const hydrated = loadTemplate(option.template)
+      setSource(hydrated)
       return
     }
 
     const templateMatch = findRelatedTemplate(option, catalog?.templates ?? [])
     if (templateMatch) {
-      setSource(templateMatch.code)
+      const hydrated = loadTemplate(templateMatch)
+      setSource(hydrated)
       return
     }
 
@@ -430,242 +592,356 @@ export function WorkspacePage() {
     window.addEventListener("pointerup", onUp)
   }
 
-  const groupedOptions = useMemo(() => {
-    const groups = new Map<string, WorkspaceModelOption[]>()
-    selectionOptions.forEach((option) => {
-      const items = groups.get(option.groupLabel) ?? []
-      items.push(option)
-      groups.set(option.groupLabel, items)
-    })
-    return Array.from(groups.entries())
-  }, [selectionOptions])
+  function applyTemplateById(templateId: string) {
+    // Fast path: option already in selectionOptions (catalog loaded)
+    const option = selectionOptions.find((item) => item.value === `template:${templateId}`)
+    if (option) {
+      applySelection(option)
+      setDrawerOpen(false)
+      return
+    }
+    // Fallback: catalog may still be loading — load directly from the catalog map
+    const template = templateById.get(templateId)
+    if (template) {
+      const hydrated = loadTemplate(template)
+      setSource(hydrated)
+      setDrawerOpen(false)
+    }
+    // If neither is available yet, delay close so the user can see the item is pending
+  }
+
+  function handleStepExecution() {
+    setValidationFailed(false)
+    setRuntimeError(null)
+
+    if (!source.trim()) return
+
+    const { templateParams } = useSimStore.getState()
+    const hasEmptyParams = Object.values(templateParams).some((v) => v === "" || v === null || v === undefined)
+    
+    if (hasEmptyParams || source.includes("{{")) {
+      setValidationFailed(true)
+      setRuntimeError("Error: Please provide valid inputs for all template parameters.")
+      return
+    }
+
+    if (!simulation || simulation.steps.length === 0) {
+      // Set the flag so Run immediately opens walkthrough, then open Run modal
+      setOpenForWalkthrough(true)
+      setPreflightOpen(true)
+      return
+    }
+    // Simulation exists: jump straight to Walkthrough Debugger, starting at step 0
+    setWalkthroughStep(0)
+    setWalkthroughOpen(true)
+  }
+
+  function handleResetExecution() {
+    setActiveStep(0)
+    setRuntimeError(null)
+  }
 
   return (
     <div style={pageShellStyle}>
-      <header style={workspaceHeaderStyle}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
-          <div style={eyebrowStyle}>QPAL WORKSPACE</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h1 style={workspaceTitleStyle}>{selectedModel?.title ?? "Quantum Experimentation Workspace"}</h1>
-            <StatusBadge label={running ? "backend active" : "backend ready"} tone={running ? "info" : "success"} />
-            {selectedModel && <StatusBadge label={selectedModel.kindLabel} tone="neutral" />}
+      {/* ── Fixed top navbar & drawer — all inside one Dialog.Root ── */}
+      <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <nav style={topNavStyle}>
+          <Dialog.Trigger asChild>
+            <button type="button" style={navHamburgerStyle} aria-label="Open navigation menu">
+              <Menu size={18} />
+            </button>
+          </Dialog.Trigger>
+          <div style={navWorkspaceLabelStyle}>QPAL WORKSPACE</div>
+          <div style={navCenterStyle}>
+            <Tooltip.Provider delayDuration={140}>
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <button type="button" style={navTitleButtonStyle}>
+                    <span>{selectedModel?.title ?? "Quantum Experimentation Workspace"}</span>
+                    <CircleHelp size={14} style={{ opacity: 0.7 }} />
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content side="bottom" align="center" sideOffset={8} style={titleTooltipStyle}>
+                    {selectedModel?.description ??
+                      "Define quantum algorithms and protocols in pseudocode, simulate execution, and inspect runtime state."}
+                    <Tooltip.Arrow style={{ fill: "#171d2c" }} />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+            </Tooltip.Provider>
           </div>
-          <p style={workspaceCopyStyle}>
-            {selectedModel?.description ??
-              "Define quantum algorithms and protocols in pseudocode, simulate execution step by step, and inspect qubit state, measurement outcomes, and protocol behavior."}
-          </p>
-        </div>
-
-        <div style={headerRailStyle}>
-          <div style={controlBoxStyle}>
-            <div style={controlLabelStyle}>Load experiment</div>
-            <select
-              value={selectedModelValue}
-              onChange={(event) => {
-                const option = selectionOptions.find((item) => item.value === event.target.value)
-                if (option) {
-                  applySelection(option)
-                }
-              }}
-              style={selectControlStyle}
+          <div style={navControlsStyle}>
+            <button
+              type="button"
+              style={{ ...headerExecButtonStyle, borderColor: "var(--accent-green)", color: "var(--accent-green)" }}
+              onClick={() => setPreflightOpen(true)}
+              disabled={!source.trim() || running}
             >
-              {groupedOptions.map(([groupLabel, options]) => (
-                <optgroup key={groupLabel} label={groupLabel}>
-                  {options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.title}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              <Play size={14} />
+              {running ? "Running" : "Run All"}
+            </button>
+            <button type="button" style={headerExecButtonStyle} onClick={handleStepExecution} disabled={running}>
+              <StepForward size={14} />
+              Step
+            </button>
+            <button type="button" style={headerExecButtonStyle} onClick={handleResetExecution} disabled={running}>
+              <RotateCcw size={14} />
+              Reset
+            </button>
+            <ThemeToggleButton label="Dark" active={theme === "dark"} onClick={() => setTheme("dark")} />
+            <ThemeToggleButton label="Light" active={theme === "light"} onClick={() => setTheme("light")} />
           </div>
+        </nav>
 
-          <div style={controlBoxStyle}>
-            <div style={controlLabelStyle}>Theme</div>
-            <div style={themeSegmentStyle}>
-              <ThemeToggleButton label="Dark mode" active={theme === "dark"} onClick={() => setTheme("dark")} />
-              <ThemeToggleButton label="Light mode" active={theme === "light"} onClick={() => setTheme("light")} />
+        {/* Drawer portal renders to document.body, connected via Dialog.Root context */}
+        <Dialog.Portal>
+          <Dialog.Overlay style={drawerOverlayStyle} />
+          <Dialog.Content style={drawerContentStyle}>
+            <div style={drawerHeaderStyle}>
+              <div>
+                <div style={eyebrowStyle}>QPAL NAVIGATION</div>
+                <Dialog.Title style={{ fontSize: 20, marginBottom: 4 }}>Workspace Menu</Dialog.Title>
+                <Dialog.Description style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  Browse algorithm and protocol templates, open docs, or run benchmarks.
+                </Dialog.Description>
+              </div>
             </div>
-          </div>
 
-          <ToolbarButton
-            icon={RefreshCw}
-            label={running ? "Simulating..." : "Run simulation"}
-            style={primaryButtonStyle}
-            onClick={handleRunWorkspace}
-            disabled={activeWorkspaceView === "pseudocode" && (parsed.errors.length > 0 || parsed.instructions.length === 0)}
-            spinning={running}
-          />
-        </div>
-      </header>
+            <Accordion.Root
+              type="multiple"
+              defaultValue={[DRAWER_TEMPLATE_GROUPS[0].id, DRAWER_TEMPLATE_GROUPS[1].id]}
+              style={{ display: "flex", flexDirection: "column", gap: 10 }}
+            >
+              {DRAWER_TEMPLATE_GROUPS.map((group) => (
+                <Accordion.Item key={group.id} value={group.id} style={drawerSectionStyle}>
+                  <Accordion.Header>
+                    <Accordion.Trigger style={drawerAccordionTriggerStyle}>
+                      {group.label}
+                      <ChevronDown size={14} />
+                    </Accordion.Trigger>
+                  </Accordion.Header>
+                  <Accordion.Content style={drawerAccordionContentStyle}>
+                    {group.items.map((item) => {
+                      const template = templateById.get(item.id)
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="drawer-template-item"
+                          style={drawerTemplateButtonStyle}
+                          onClick={() => applyTemplateById(item.id)}
+                          disabled={!template}
+                          title={template ? template.description : "Template unavailable"}
+                        >
+                          {item.label}
+                        </button>
+                      )
+                    })}
+                  </Accordion.Content>
+                </Accordion.Item>
+              ))}
+            </Accordion.Root>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                type="button"
+                style={drawerActionLinkStyle}
+                onClick={() => {
+                  setDrawerOpen(false)
+                  setDocsOpen(true)
+                }}
+              >
+                <BookOpenText size={14} />
+                Open docs page
+              </button>
+              <button
+                type="button"
+                style={drawerActionButtonStyle}
+                onClick={() => {
+                  setDrawerOpen(false)
+                  setBenchmarkModalOpen(true)
+                }}
+              >
+                <Cpu size={14} />
+                Benchmarks
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={benchmarkModalOpen} onOpenChange={setBenchmarkModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay style={modalOverlayStyle} />
+          <Dialog.Content style={benchmarkModalStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div>
+                <div style={eyebrowStyle}>BENCHMARKS</div>
+                <Dialog.Title style={{ fontSize: 20, marginBottom: 4 }}>System Benchmarks</Dialog.Title>
+                <Dialog.Description style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  Run backend benchmark families and inspect hardware + timing results.
+                </Dialog.Description>
+              </div>
+              <button type="button" onClick={() => void handleRunBenchmarks()} style={primaryButtonStyle} disabled={benchmarking}>
+                {benchmarking ? <RefreshCw size={14} className="spin" /> : <Cpu size={14} />}
+                {benchmarking ? "Running..." : "Run Benchmarks"}
+              </button>
+            </div>
+
+            <div style={benchmarkStatsGridStyle}>
+              <div style={supportPanelStyle}>
+                <div style={eyebrowStyle}>CPU</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{benchmarks?.capabilities.cpu ?? "Not scanned yet"}</div>
+                <div style={{ color: "var(--text-secondary)", marginTop: 6 }}>
+                  {benchmarks ? `${benchmarks.capabilities.cpu_cores} cores` : "Run benchmarks to detect hardware"}
+                </div>
+              </div>
+              <div style={supportPanelStyle}>
+                <div style={eyebrowStyle}>GPU</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>
+                  {benchmarks?.capabilities.gpu_available ? benchmarks.capabilities.gpu_name ?? "Detected" : "Not detected"}
+                </div>
+                <div style={{ color: "var(--text-secondary)", marginTop: 6 }}>{benchmarks?.capabilities.gpu_memory ?? "CPU fallback if unavailable"}</div>
+              </div>
+            </div>
+
+            <div style={supportPanelStyle}>
+              <div style={eyebrowStyle}>Benchmark Table</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(benchmarks?.results ?? []).map((result) => (
+                  <div key={result.id} style={benchmarkRowStyle}>
+                    <div style={{ width: 120 }}>
+                      <strong>{result.label}</strong>
+                      <div style={{ color: "var(--text-muted)", fontSize: 11 }}>{result.family}</div>
+                    </div>
+                    <div style={{ width: 50 }}>{result.qubits}q</div>
+                    <div style={{ width: 90 }}>{result.depth} depth</div>
+                    <div style={{ width: 100, fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>{result.duration_ms.toFixed(3)} ms</div>
+                    <div style={{ flex: 1, minWidth: 160 }}>
+                      <div style={benchmarkBarTrackStyle}>
+                        <div style={{ ...benchmarkBarFillStyle, width: `${Math.min(100, result.duration_ms * 8)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {!benchmarks?.results.length && <div style={{ color: "var(--text-secondary)" }}>No benchmark results yet.</div>}
+              </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <PreFlightModal
+        open={preflightOpen}
+        onOpenChange={(open) => {
+          setPreflightOpen(open)
+          if (!open) setOpenForWalkthrough(false) // clear flag if user cancels
+        }}
+        onConfirm={() => void handleRunWorkspace()}
+        source={source}
+      />
+
+      {/* ── Step-by-Step Debugger modal ── */}
+      {simulation && (
+        <StepWalkthroughModal
+          open={walkthroughOpen}
+          onOpenChange={setWalkthroughOpen}
+          steps={simulation.steps}
+          currentStep={walkthroughStep}
+          onStepChange={setWalkthroughStep}
+          onFinish={() => {
+            setWalkthroughOpen(false)
+            setActiveInspector("state")
+          }}
+        />
+      )}
+
+      <DocumentationModal open={docsOpen} onOpenChange={setDocsOpen} templates={catalog?.templates ?? []} />
 
       <div ref={containerRef} className="workspace-main" style={{ "--workspace-right-width": `${rightPaneWidth}px` } as CSSProperties}>
         <section className="workspace-pane workspace-left-pane">
-          <SectionCard
-            title="Execution Timeline"
-            subtitle="Step through the simulation trace — inspect state changes, measurements, and transport events at each instruction."
-            action={
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <StatusBadge label={`${simulation?.summary.total_steps ?? parsed.instructions.length} steps`} tone="neutral" />
-                <StatusBadge label={`${simulation?.summary.measurements ?? 0} measurements`} tone="info" />
+
+          <div style={splitWorkspaceHostStyle}>
+            <div style={stackedWorkspaceShellStyle}>
+              <div style={stackedTopPaneStyle}>
+                <WorkspaceCircuitBuilder canSync={parsed.instructions.length > 0} />
               </div>
-            }
-          >
-            <div style={timelineSurfaceStyle}>
-              <div style={runtimeSummaryStyle}>
-                <div style={{ flex: "1 1 180px", minWidth: 0 }}>
-                  <div style={eyebrowStyle}>Current Instruction</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-                    {selectedStep?.instruction.raw ?? "Run the backend to inspect the current model."}
+              <div style={terminalPaneStyle}>
+                <div style={editorHeaderStyle}>
+                  <select
+                    value={engine}
+                    onChange={(event) => setEngine(event.target.value as "custom" | "openqasm" | "qunetsim")}
+                    style={engineSelectStyle}
+                    aria-label="Execution engine"
+                  >
+                    <option value="custom">QPAL Parser</option>
+                    <option value="openqasm">OpenQASM 3.0</option>
+                    <option value="qunetsim">QuNetSim</option>
+                  </select>
+                  <div style={editorHeaderIconsStyle}>
+                    <button type="button" aria-label="Editor info" style={editorHeaderIconButtonStyle}>
+                      <Info size={14} />
+                    </button>
+                    <button type="button" aria-label="Editor options" style={editorHeaderIconButtonStyle}>
+                      <MoreHorizontal size={14} />
+                    </button>
                   </div>
                 </div>
-                <div style={{ flex: "1 1 180px", minWidth: 0 }}>
-                  <div style={eyebrowStyle}>Backend Event</div>
-                  <div style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>
-                    {selectedStep?.event ?? "Waiting for valid code"}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <input
-                  type="range"
-                  min={0}
-                  max={Math.max((simulation?.steps.length ?? 1) - 1, 0)}
-                  value={Math.min(activeStep, Math.max((simulation?.steps.length ?? 1) - 1, 0))}
-                  onChange={(event) => setActiveStep(Number(event.target.value))}
-                  style={{ flex: "1 1 320px" }}
-                  disabled={!simulation || simulation.steps.length === 0}
-                />
-                <span style={timelineCounterStyle}>
-                  {selectedStep ? `${selectedStep.index + 1}/${simulation?.steps.length ?? 0}` : "idle"}
-                </span>
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title={activeWorkspaceView === "circuit" ? "Circuit View" : "Pseudocode Editor"}
-            subtitle={
-              activeWorkspaceView === "circuit"
-                ? "Visual circuit representation of the current program. Use as a secondary view alongside the pseudocode editor."
-                : "Write quantum programs in the QPAL pseudo language. The primary way to define experiments, protocols, and algorithms."
-            }
-            action={
-              <div style={workspaceViewActionStyle}>
-                <div style={tabRailStyle}>
-                  {WORKSPACE_VIEWS.map((view) => (
-                    <button
-                      key={view.id}
-                      onClick={() => handleWorkspaceViewChange(view.id)}
-                      style={{
-                        ...tabButtonStyle,
-                        borderColor: activeWorkspaceView === view.id ? "var(--accent-cyan)" : "var(--border)",
-                        color: activeWorkspaceView === view.id ? "var(--text-primary)" : "var(--text-secondary)",
-                        background: activeWorkspaceView === view.id ? "var(--bg-active)" : "transparent",
-                      }}
-                    >
-                      {view.label}
+                <div style={syntaxChipRailStyle}>
+                  {QUICK_SYNTAX.map((line) => (
+                    <button key={line} type="button" onClick={() => setSource((current) => `${current.trimEnd()}\n${line}`)} style={syntaxChipStyle}>
+                      {line}
                     </button>
                   ))}
                 </div>
-
-                <div style={presetPickerStyle}>
-                  <div style={presetPickerLabelStyle}>Circuit presets</div>
-                  <select
-                    aria-label="Load circuit preset"
-                    value={presetPickerValue}
-                    onChange={(event) => {
-                      const option = presetSelectionOptions.find((item) => item.value === event.target.value)
-                      if (!option) return
-                      applyPresetSelection(option)
-                      setPresetPickerValue("")
-                    }}
-                    style={{ ...selectControlStyle, ...presetPickerSelectStyle }}
-                  >
-                    <option value="">Load preset</option>
-                    {presetSelectionOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            }
-          >
-            {activeWorkspaceView === "circuit" ? (
-              <WorkspaceCircuitBuilder instructions={parsed.instructions} canSync={parsed.errors.length === 0 && parsed.instructions.length > 0} />
-            ) : (
-              <div style={pseudocodeShellStyle}>
-                <div style={pseudocodeEditorColumnStyle}>
-                  <div style={syntaxChipRailStyle}>
-                    {QUICK_SYNTAX.map((line) => (
-                      <button key={line} type="button" onClick={() => setSource((current) => `${current.trimEnd()}\n${line}`)} style={syntaxChipStyle}>
-                        {line}
-                      </button>
-                    ))}
-                  </div>
-
-                  <textarea value={source} onChange={(event) => setSource(event.target.value)} spellCheck={false} style={editorStyle} />
-                </div>
-
-                <div style={pseudocodeSidebarStyle}>
-                  <div style={metricGridStyle}>
-                    <MetricTile label="Qubits" value={String(simulation?.summary.qubits.length ?? parsed.qubits.length)} />
-                    <MetricTile label="Actors" value={String(simulation?.summary.actors.length ?? parsed.actors.length)} />
-                    <MetricTile label="Steps" value={String(simulation?.summary.total_steps ?? parsed.instructions.length)} />
-                    <MetricTile label="Measures" value={String(simulation?.summary.measurements ?? 0)} />
-                  </div>
-
-                  <ExecutionSnapshot
-                    selectedState={selectedState}
-                    instruction={selectedStep?.instruction.raw ?? "No backend step selected yet."}
-                    event={selectedStep?.event ?? "Waiting for valid code"}
-                    latestMeasurement={latestMeasurement ? `${latestMeasurement.qubit} -> ${latestMeasurement.value} (${latestMeasurement.basis})` : "No measurements yet"}
-                    latestTransmission={
-                      latestTransmission
-                        ? `${latestTransmission.qubit} ${latestTransmission.status} ${latestTransmission.intercepted_by ?? latestTransmission.to_actor ?? ""}`.trim()
-                        : "No transport events yet"
-                    }
+                <div style={{ borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid #2a3248" }}>
+                  <Editor 
+                    height="220px" 
+                    language={engine === "qunetsim" ? "python" : engine === "openqasm" ? "c" : "plaintext"} 
+                    theme={theme === "dark" ? "vs-dark" : "light"}
+                    value={source} 
+                    onChange={(val) => setSource(val ?? "")}
+                    options={{ minimap: { enabled: false }, fontSize: 13, fontFamily: "var(--font-mono)", padding: { top: 12 }, scrollBeyondLastLine: false }}
                   />
+                </div>
 
-                  {(runtimeError || catalogError || simulation?.warnings.length) && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {runtimeError && <RuntimeNotice tone="danger" text={runtimeError} />}
-                      {catalogError && <RuntimeNotice tone="danger" text={catalogError} />}
-                      {simulation?.warnings.map((warning) => (
-                        <RuntimeNotice key={warning} tone="warning" text={warning} />
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="workspace-support-grid">
-                    <IssuePanel
-                      title="Parser Feedback"
-                      emptyLabel="No parser issues. The program is ready for backend execution."
-                      errors={parsed.errors}
-                      warnings={parsed.warnings}
-                    />
-                    <JsonPreview instructions={parsed.instructions} />
+                {(runtimeError || catalogError || simulation?.warnings.length) && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                    {runtimeError && <RuntimeNotice tone="danger" text={runtimeError} />}
+                    {catalogError && <RuntimeNotice tone="danger" text={catalogError} />}
+                    {simulation?.warnings.map((warning) => (
+                      <RuntimeNotice key={warning} tone="warning" text={warning} />
+                    ))}
                   </div>
+                )}
+
+                <div className="workspace-support-grid" style={{ marginTop: 12 }}>
+                  <IssuePanel
+                    title="Parser Feedback"
+                    emptyLabel="No parser issues. The program is ready for backend execution."
+                    errors={parsed.errors}
+                    warnings={parsed.warnings}
+                  />
+                  <JsonPreview instructions={parsed.instructions} />
                 </div>
               </div>
-            )}
-          </SectionCard>
+            </div>
+          </div>
         </section>
 
         <div className="workspace-resizer" onPointerDown={handleResizeStart} title="Resize inspector" />
 
         <aside className="workspace-pane workspace-right-pane" style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <AlgorithmSettingsPanel onUpdateSource={setSource} validationFailed={validationFailed} />
+          
           <SectionCard
             title="Inspector"
-            subtitle="The current model selection drives the studio, docs, and benchmark context from here."
+            subtitle="Inspect state, Bloch vectors, analysis, and model-specific docs from here."
             style={{ display: "flex", flexDirection: "column" }}
             action={
               <div style={tabRailStyle}>
-                {INSPECTOR_TABS.map((tab) => (
+                {INSPECTOR_TABS.filter((tab) => tab.id !== "studio" || selectedModel?.studioId).map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveInspector(tab.id)}
@@ -685,9 +961,6 @@ export function WorkspacePage() {
             {activeInspector === "studio" && <LearningStudioPanel />}
             {activeInspector === "state" && <StateInspector state={selectedState} instructions={parsed.instructions} stepLabel={selectedStep?.event ?? "No active step"} />}
             {activeInspector === "bloch" && <BlochInspector state={selectedState} />}
-            {activeInspector === "benchmarks" && (
-              <BenchmarksPanel benchmarks={benchmarks} benchmarking={benchmarking} onRun={handleRunBenchmarks} profiles={filteredBenchmarks} context={inspectorContext} />
-            )}
             {activeInspector === "docs" && <DocsPanel syntax={catalog?.syntax ?? []} templates={filteredTemplates} notes={catalog?.architecture_notes ?? []} context={inspectorContext} />}
             {activeInspector === "analysis" && (
               <WorkspaceAnalysisPanel
@@ -731,29 +1004,6 @@ function SectionCard({
   )
 }
 
-function ToolbarButton({
-  icon: Icon,
-  label,
-  style,
-  onClick,
-  disabled,
-  spinning,
-}: {
-  icon: LucideIcon
-  label: string
-  style: CSSProperties
-  onClick: () => void
-  disabled?: boolean
-  spinning?: boolean
-}) {
-  return (
-    <button onClick={onClick} style={{ ...style, opacity: disabled ? 0.55 : 1 }} disabled={disabled}>
-      <Icon size={14} className={spinning ? "spin" : undefined} />
-      {label}
-    </button>
-  )
-}
-
 function ThemeToggleButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
@@ -771,64 +1021,6 @@ function ThemeToggleButton({ label, active, onClick }: { label: string; active: 
     >
       {label}
     </button>
-  )
-}
-
-function MetricTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={metricTileStyle}>
-      <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text-primary)" }}>{value}</div>
-    </div>
-  )
-}
-
-function ExecutionSnapshot({
-  selectedState,
-  instruction,
-  event,
-  latestMeasurement,
-  latestTransmission,
-}: {
-  selectedState: WorkspaceExecutionState | null
-  instruction: string
-  event: string
-  latestMeasurement: string
-  latestTransmission: string
-}) {
-  return (
-    <div style={snapshotSurfaceStyle}>
-      <div style={snapshotHeroStyle}>
-        <div>
-          <div style={eyebrowStyle}>Current backend event</div>
-          <div style={{ fontSize: 17, fontWeight: 700 }}>{event}</div>
-          <div style={{ marginTop: 6, color: "var(--text-secondary)", lineHeight: 1.6 }}>{instruction}</div>
-        </div>
-        <StatusBadge label={selectedState ? `${selectedState.qubits.length} live qubits` : "idle"} tone={selectedState ? "info" : "neutral"} />
-      </div>
-
-      <div style={snapshotGridStyle}>
-        <SnapshotLine label="Measurement" value={latestMeasurement} />
-        <SnapshotLine label="Transport" value={latestTransmission} />
-        <SnapshotLine
-          label="Ownership"
-          value={
-            selectedState?.actors.length
-              ? selectedState.actors.map((actor) => `${actor.name}:${actor.owned_qubits.length}`).join("  |  ")
-              : "No actor assignments yet"
-          }
-        />
-      </div>
-    </div>
-  )
-}
-
-function SnapshotLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={snapshotLineStyle}>
-      <div style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>{label}</div>
-      <div style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>{value}</div>
-    </div>
   )
 }
 
@@ -909,80 +1101,253 @@ function RuntimeNotice({ tone, text }: { tone: "danger" | "warning"; text: strin
   return <div style={{ borderRadius: "var(--radius-md)", border: `1px solid ${color}`, padding: "10px 12px", color }}>{text}</div>
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const pageShellStyle: CSSProperties = {
   height: "100%",
   minHeight: 0,
   padding: "16px",
+  paddingTop: 56,
   display: "flex",
   flexDirection: "column",
   gap: 16,
   overflow: "auto",
 }
 
-const workspaceHeaderStyle: CSSProperties = {
-  borderRadius: "var(--radius-xl)",
-  border: "1px solid var(--border)",
-  padding: "18px 20px",
-  background: "linear-gradient(180deg, var(--bg-panel), var(--bg-elevated))",
+const topNavStyle: CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  height: 56,
+  zIndex: 50,
+  display: "flex",
+  alignItems: "center",
+  paddingInline: 16,
+  gap: 12,
+  borderBottom: "1px solid var(--border)",
+  background: "var(--bg-panel)",
   boxShadow: "var(--shadow-card)",
+}
+
+const navHamburgerStyle: CSSProperties = {
+  width: 38,
+  height: 38,
+  flexShrink: 0,
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "transparent",
+  color: "var(--text-primary)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const navWorkspaceLabelStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 700,
+  fontFamily: "var(--font-mono)",
+  color: "var(--text-primary)",
+  letterSpacing: "0.08em",
+  whiteSpace: "nowrap",
+}
+
+const navCenterStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
   display: "flex",
-  justifyContent: "space-between",
-  flexWrap: "wrap",
-  gap: 18,
-  alignItems: "start",
+  justifyContent: "center",
 }
 
-const workspaceTitleStyle: CSSProperties = {
-  fontSize: "clamp(1.45rem, 2.4vw, 2rem)",
-  lineHeight: 1.1,
+const navTitleButtonStyle: CSSProperties = {
+  maxWidth: "min(58vw, 640px)",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "8px 12px",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  color: "var(--text-primary)",
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
 }
 
-const workspaceCopyStyle: CSSProperties = {
-  color: "var(--text-secondary)",
-  maxWidth: 780,
-  lineHeight: 1.7,
+const titleTooltipStyle: CSSProperties = {
+  maxWidth: 440,
+  borderRadius: "var(--radius-md)",
+  border: "1px solid #283247",
+  background: "#171d2c",
+  color: "#d7dfef",
+  padding: "10px 12px",
+  fontSize: 12,
+  lineHeight: 1.65,
+  boxShadow: "var(--shadow-card)",
 }
 
-const headerRailStyle: CSSProperties = {
+const navControlsStyle: CSSProperties = {
+  marginLeft: "auto",
   display: "flex",
-  alignItems: "stretch",
-  gap: 10,
-  flexWrap: "wrap",
-  justifyContent: "flex-end",
+  alignItems: "center",
+  gap: 6,
 }
 
-const controlBoxStyle: CSSProperties = {
-  minWidth: 240,
+const headerExecButtonStyle: CSSProperties = {
+  height: 34,
+  padding: "0 10px",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  color: "var(--text-primary)",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 12,
+  fontWeight: 700,
+}
+
+const drawerOverlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0, 0, 0, 0.5)",
+  zIndex: 40,
+}
+
+const drawerContentStyle: CSSProperties = {
+  position: "fixed",
+  left: 0,
+  top: 0,
+  bottom: 0,
+  width: "min(420px, 92vw)",
+  zIndex: 45,
+  background: "var(--bg-panel)",
+  borderRight: "1px solid var(--border)",
+  padding: "18px 14px 14px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+  overflowY: "auto",
+}
+
+const drawerHeaderStyle: CSSProperties = {
   borderRadius: "var(--radius-lg)",
   border: "1px solid var(--border)",
   background: "var(--bg-card)",
+  padding: "12px",
+}
+
+const drawerSectionStyle: CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+}
+
+const drawerAccordionTriggerStyle: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
   padding: "10px 12px",
+  fontWeight: 700,
+}
+
+const drawerAccordionContentStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
+  padding: "0 10px 10px",
 }
 
-const controlLabelStyle: CSSProperties = {
-  fontSize: 10,
-  color: "var(--text-muted)",
-  fontFamily: "var(--font-mono)",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-}
-
-const selectControlStyle: CSSProperties = {
-  minWidth: 240,
-  background: "var(--bg-panel)",
-}
-
-const themeSegmentStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
+const drawerTemplateButtonStyle: CSSProperties = {
   borderRadius: "var(--radius-md)",
   border: "1px solid var(--border)",
-  background: "var(--bg-panel)",
-  padding: 4,
+  background: "var(--bg-active)",
+  padding: "8px 10px",
+  textAlign: "left",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "var(--text-primary)",
+}
+
+const drawerActionLinkStyle: CSSProperties = {
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  padding: "10px 12px",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  color: "var(--text-primary)",
+  textDecoration: "none",
+}
+
+const drawerActionButtonStyle: CSSProperties = {
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--accent-cyan)",
+  background: "var(--accent-cyan)",
+  color: "var(--button-primary-text)",
+  padding: "10px 12px",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 8,
+  fontWeight: 700,
+}
+
+const modalOverlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0, 0, 0, 0.55)",
+  zIndex: 50,
+}
+
+const benchmarkModalStyle: CSSProperties = {
+  position: "fixed",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  width: "min(920px, 94vw)",
+  maxHeight: "86vh",
+  overflowY: "auto",
+  zIndex: 55,
+  borderRadius: "var(--radius-xl)",
+  border: "1px solid var(--border)",
+  background: "linear-gradient(180deg, var(--bg-panel), var(--bg-elevated))",
+  padding: 16,
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+}
+
+const benchmarkStatsGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+  gap: 10,
+}
+
+const benchmarkRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  flexWrap: "wrap",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-active)",
+  padding: "10px 12px",
+}
+
+const benchmarkBarTrackStyle: CSSProperties = {
+  height: 8,
+  borderRadius: 999,
+  background: "rgba(88, 164, 146, 0.15)",
+  overflow: "hidden",
+}
+
+const benchmarkBarFillStyle: CSSProperties = {
+  height: "100%",
+  background: "var(--accent-cyan)",
 }
 
 const sectionCardStyle: CSSProperties = {
@@ -1026,30 +1391,6 @@ const primaryButtonStyle: CSSProperties = {
   height: "fit-content",
 }
 
-const timelineSurfaceStyle: CSSProperties = {
-  padding: "12px 14px",
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-}
-
-const runtimeSummaryStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 12,
-}
-
-const timelineCounterStyle: CSSProperties = {
-  fontSize: 11,
-  fontFamily: "var(--font-mono)",
-  color: "var(--accent-cyan)",
-  minWidth: 52,
-  textAlign: "right",
-}
-
 const tabRailStyle: CSSProperties = {
   display: "flex",
   gap: 8,
@@ -1072,46 +1413,79 @@ const tabButtonStyle: CSSProperties = {
   fontWeight: 600,
 }
 
-const presetPickerStyle: CSSProperties = {
-  minWidth: 180,
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-}
-
-const presetPickerLabelStyle: CSSProperties = {
-  fontSize: 10,
-  color: "var(--text-muted)",
-  fontFamily: "var(--font-mono)",
-  textTransform: "uppercase",
-  letterSpacing: "0.06em",
-}
-
-const presetPickerSelectStyle: CSSProperties = {
-  minWidth: 180,
-  width: "100%",
-}
-
-const pseudocodeShellStyle: CSSProperties = {
-  display: "flex",
-  gap: 16,
-  flexWrap: "wrap",
-  alignItems: "stretch",
-}
-
-const pseudocodeEditorColumnStyle: CSSProperties = {
-  flex: "1 1 460px",
-  minWidth: 0,
-  display: "flex",
-  flexDirection: "column",
-}
-
-const pseudocodeSidebarStyle: CSSProperties = {
-  flex: "1 1 360px",
-  minWidth: 0,
+const stackedWorkspaceShellStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 12,
+  flex: 1,
+  width: "100%",
+  height: "100%",
+  minHeight: 0,
+}
+
+const splitWorkspaceHostStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  width: "100%",
+  display: "flex",
+}
+
+const stackedTopPaneStyle: CSSProperties = {
+  flex: "1 1 58%",
+  minHeight: 320,
+}
+
+const terminalPaneStyle: CSSProperties = {
+  flex: "1 1 42%",
+  borderRadius: "var(--radius-lg)",
+  border: "1px solid #2a2f3f",
+  background: "#111622",
+  padding: "10px 10px 12px",
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 260,
+}
+
+const editorHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  marginBottom: 10,
+  padding: "6px 8px",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid #2a3248",
+  background: "#0c111d",
+}
+
+const engineSelectStyle: CSSProperties = {
+  minWidth: 180,
+  maxWidth: 240,
+  borderRadius: "var(--radius-sm)",
+  border: "1px solid #2f3a53",
+  background: "#171d2c",
+  color: "#d4def4",
+  padding: "6px 10px",
+  fontSize: 12,
+  fontFamily: "var(--font-mono)",
+}
+
+const editorHeaderIconsStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+}
+
+const editorHeaderIconButtonStyle: CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: "var(--radius-sm)",
+  border: "1px solid #2f3a53",
+  background: "#171d2c",
+  color: "#a5b4d6",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
 }
 
 const syntaxChipRailStyle: CSSProperties = {
@@ -1123,9 +1497,9 @@ const syntaxChipRailStyle: CSSProperties = {
 
 const syntaxChipStyle: CSSProperties = {
   borderRadius: 999,
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
-  color: "var(--text-secondary)",
+  border: "1px solid #2f3a53",
+  background: "#171d2c",
+  color: "#a5b4d6",
   padding: "6px 10px",
   fontSize: 11,
   fontFamily: "var(--font-mono)",
@@ -1133,59 +1507,16 @@ const syntaxChipStyle: CSSProperties = {
 
 const editorStyle: CSSProperties = {
   width: "100%",
-  minHeight: 540,
+  minHeight: 220,
   resize: "vertical",
   fontFamily: "var(--font-mono)",
-  fontSize: 13,
-  lineHeight: 1.7,
-  background: "var(--bg-code)",
-  borderRadius: "var(--radius-lg)",
-  padding: "14px",
-}
-
-const metricGridStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 10,
-}
-
-const metricTileStyle: CSSProperties = {
-  flex: "1 1 120px",
+  fontSize: 12,
+  lineHeight: 1.75,
+  background: "#0b101a",
+  color: "#d4def4",
+  border: "1px solid #2a3248",
   borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
-  padding: "12px",
-}
-
-const snapshotSurfaceStyle: CSSProperties = {
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
   padding: "14px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-}
-
-const snapshotHeroStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  justifyContent: "space-between",
-  gap: 12,
-  flexWrap: "wrap",
-}
-
-const snapshotGridStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 10,
-}
-
-const snapshotLineStyle: CSSProperties = {
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-active)",
-  padding: "10px 12px",
 }
 
 const jsonStyle: CSSProperties = {
@@ -1206,3 +1537,4 @@ const eyebrowStyle: CSSProperties = {
   letterSpacing: "0.08em",
   marginBottom: 8,
 }
+

@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { WorkspacePage } from "@/components/workspace/WorkspacePage"
+import { WorkspaceDocsPage } from "@/components/workspace/WorkspaceDocsPage"
 
 const SHOW_ERROR_DETAILS = import.meta.env.DEV
 
@@ -98,8 +100,14 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBounda
 
 export default function App() {
   return (
-    <AppErrorBoundary>
-      <WorkspacePage />
-    </AppErrorBoundary>
+    <BrowserRouter>
+      <AppErrorBoundary>
+        <Routes>
+          <Route path="/" element={<WorkspacePage />} />
+          <Route path="/docs" element={<WorkspaceDocsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AppErrorBoundary>
+    </BrowserRouter>
   )
 }

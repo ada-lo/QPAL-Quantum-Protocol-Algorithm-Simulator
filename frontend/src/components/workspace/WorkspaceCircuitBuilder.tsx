@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from "react"
+import type { CSSProperties } from "react"
 
 import { CircuitGrid } from "@/components/circuit/CircuitGrid"
 import { GatePanel, GatePanelBottom } from "@/components/circuit/GatePanel"
@@ -7,28 +7,14 @@ import { PlaybackControls } from "@/components/circuit/PlaybackControls"
 import { useLocalSim } from "@/hooks/useLocalSim"
 import { useUndoRedo } from "@/hooks/useUndoRedo"
 import { useUrlCircuit } from "@/hooks/useUrlCircuit"
-import { programToCircuit } from "@/lib/workspace/programToCircuit"
-import type { WorkspaceInstruction } from "@/lib/workspace/types"
 import { useCircuitStore } from "@/store/circuitStore"
 
-export function WorkspaceCircuitBuilder({
-  instructions,
-  canSync,
-}: {
-  instructions: WorkspaceInstruction[]
-  canSync: boolean
-}) {
-  const { nQubits, setNQubits, clearCircuit, undo, redo, undoStack, redoStack, replaceCircuit } = useCircuitStore()
+export function WorkspaceCircuitBuilder({ canSync }: { canSync: boolean }) {
+  const { nQubits, setNQubits, clearCircuit, undo, redo, undoStack, redoStack } = useCircuitStore()
 
   useLocalSim()
   useUndoRedo()
   useUrlCircuit()
-
-  useEffect(() => {
-    if (!canSync || instructions.length === 0) return
-    const snapshot = programToCircuit(instructions)
-    replaceCircuit(snapshot.gates, snapshot.nQubits, snapshot.initialStates)
-  }, [canSync, instructions, replaceCircuit])
 
   return (
     <div style={builderShellStyle}>

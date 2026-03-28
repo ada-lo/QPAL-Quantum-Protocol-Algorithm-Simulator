@@ -1,99 +1,155 @@
 # QPAL Workspace Guide
 
-## Overview
+## Purpose
 
-QPAL is an interactive quantum workspace for understanding, analyzing, and experimenting with quantum algorithms and communication protocols.
+QPAL is a workspace-first quantum learning app with three execution modes:
 
-The workspace follows a pseudocode-first flow:
+- `custom`: QPAL pseudocode parsed into workspace instructions and executed by the backend symbolic runtime plus the built-in `_MiniSV` statevector helper
+- `openqasm`: raw OpenQASM 3.0 executed through the Qiskit adapter
+- `qunetsim`: Python-like network scripts executed through the QuNetSim adapter or the local stub layer
 
-Flow:
+The current app is centered on the workspace experience in `frontend/src/components/workspace/WorkspacePage.tsx`, with `/docs` as a secondary route for template browsing.
 
-1. The user writes pseudocode in the editor.
-2. The TypeScript parser converts it into structured instruction objects.
-3. The frontend sends those instruction objects to the backend.
-4. The FastAPI workspace executor simulates the program step by step.
-5. The frontend renders the returned state as:
-   - a circuit timeline
-   - measurement and transport logs
-   - Bloch vectors
-   - benchmark results
+## Runtime Flow
+
+The workspace is no longer a simple "parse once, send instructions" pipeline. The current flow is:
+
+1. The user edits source in Monaco on `WorkspacePage`.
+2. The frontend parser in `frontend/src/lib/workspace/pseudoParser.ts` validates QPAL pseudocode for immediate UX feedback.
+3. Parsed instructions are mirrored into the visual circuit store through `frontend/src/lib/workspace/programToCircuit.ts`.
+4. Circuit edits flow back into text through `frontend/src/lib/workspace/circuitToProgram.ts`.
+5. A debounced effect posts the raw source string plus the selected engine to `POST /api/workspace/simulate`.
+6. The backend route in `backend/api/routes/workspace.py` dispatches to one of three engines:
+   - `custom` -> `backend/core/workspace/parser.py` + `backend/core/workspace/executor.py`
+   - `openqasm` -> `backend/core/engines/qasm_engine.py`
+   - `qunetsim` -> `backend/core/engines/qunetsim_engine.py`
+7. The response drives the inspector panels, walkthrough modal, state cards, Bloch panel, and benchmark/analysis affordances.
 
 ## Frontend Architecture
 
-Key files:
+### Core workspace shell
 
 - `frontend/src/App.tsx`
-  Active app entry. It now renders only the workspace page.
+  Defines the `/` workspace route and `/docs` route behind an error boundary.
 - `frontend/src/components/workspace/WorkspacePage.tsx`
-  Main screen: editor, circuit timeline, inspector, theme switch, resizable right pane.
-- `frontend/src/components/workspace/WorkspaceTimeline.tsx`
-  Renders parsed instructions as a circuit-like horizontal timeline.
+  Owns the main layout, source editor, engine switcher, template/model selection, execution loop, and text-to-circuit synchronization.
+- `frontend/src/components/workspace/WorkspaceCircuitBuilder.tsx`
+  Hosts the editable circuit grid, gate palette, undo/redo, URL sync, and local circuit simulator hooks.
 - `frontend/src/components/workspace/WorkspaceInspectors.tsx`
-  State, docs, and benchmark panels.
-- `frontend/src/components/workspace/WorkspaceBlochPanel.tsx`
-  Zoomable Bloch sphere cards.
+  Renders the state inspector, docs panel, benchmark panel, and template parameter controls.
+- `frontend/src/components/workspace/WorkspaceAnalysisPanel.tsx`
+  Calls the analysis endpoint and displays entanglement, landscape, and Stim/QEC outputs.
+
+### Parsing and sync layer
+
 - `frontend/src/lib/workspace/pseudoParser.ts`
-  Custom parser that validates syntax and expands macros.
+  Frontend parser for QPAL pseudocode. Returns `instructions`, `errors`, `warnings`, discovered qubits, and discovered actors.
+- `frontend/src/lib/workspace/programToCircuit.ts`
+  Converts parsed instructions into the circuit-grid snapshot used by the visual editor.
+- `frontend/src/lib/workspace/circuitToProgram.ts`
+  Converts the circuit store back into QPAL pseudocode so drag-and-drop edits remain editable as source.
 - `frontend/src/lib/workspace/api.ts`
-  Workspace API client.
+  Thin fetch client for catalog, simulate, and benchmark requests.
 - `frontend/src/lib/workspace/types.ts`
-  Shared frontend types for parser and backend responses.
+  Shared TypeScript view models for parser output and API payloads.
+
+### State and selection
+
+- `frontend/src/store/simStore.ts`
+  Stores engine selection, pre-flight settings, walkthrough state, and template parameter hydration.
+- `frontend/src/store/circuitStore.ts`
+  Owns the circuit grid state used by the workspace builder and sync layer.
+- `frontend/src/utils/languagePresets.ts`
+  Contains engine-specific example snippets for a subset of templates.
 
 ## Backend Architecture
 
-Key files:
+### API surface
 
+- `backend/main.py`
+  FastAPI bootstrap, CORS setup, `/health`, and router registration.
 - `backend/api/routes/workspace.py`
-  Catalog, simulation, and benchmark endpoints.
+  Exposes `/api/workspace/catalog`, `/simulate`, `/benchmarks`, and `/analyze`.
 - `backend/api/schemas/workspace.py`
-  Pydantic models for workspace requests and responses.
-- `backend/core/workspace/catalog.py`
-  Syntax reference, template programs, benchmark catalog.
+  Pydantic request and response models for instructions, execution snapshots, catalog data, benchmarks, and analysis.
+
+### Custom workspace engine
+
+- `backend/core/workspace/parser.py`
+  Python parser for QPAL pseudocode. Used by the backend `custom` engine path.
 - `backend/core/workspace/executor.py`
-  Simplified state engine for qubits, actors, transport, and measurements.
+  Symbolic workspace runtime plus `_MiniSV`, a lightweight pure-Python statevector simulator used to keep Bloch vectors and some measurement behavior grounded in actual amplitudes.
+- `backend/core/workspace/catalog.py`
+  Source of truth for syntax reference items, template programs, benchmark profiles, and architecture notes returned by the catalog endpoint.
 - `backend/core/workspace/benchmarks.py`
-  GHZ/QFT/Grover/QAOA-style benchmark generation and timing.
+  Pure-Python benchmark runner backed by `_MiniSV`.
+- `backend/core/workspace/analysis.py`
+  Optional analysis endpoint for entanglement metrics, parameter landscapes, and Stim-based stabilizer runs.
 
-## Pseudo Language
+### Alternate engines
 
-### Core quantum syntax
+- `backend/core/engines/qasm_engine.py`
+  Qiskit-backed OpenQASM executor. Produces state snapshots from statevectors and measurement summaries from shot counts.
+- `backend/core/engines/qunetsim_engine.py`
+  Executes user code in a restricted namespace and logs send/measure events through either wrappers around real QuNetSim classes or local stub implementations.
+
+## QPAL Pseudocode
+
+### Supported comments
+
+The parser skips blank lines plus lines starting with:
+
+- `#`
+- `//`
+
+### Quantum operations
 
 ```text
 INIT q0
 INIT q1 1
 INIT q2 +
+INIT q3 -
 RESET q0
 H q0
 X q0
 Y q0
 Z q0
+S q0
+T q0
+SDG q0
+TDG q0
+SX q0
+RX q0 1.5708
+RY q0 1.5708
+RZ q0 1.5708
 CNOT q0 q1
 SWAP q0 q1
+CZ q0 q1
+TOFFOLI q0 q1 q2
 MEASURE q0
 MEASURE q0 BASIS X
 MEASURE q0 [BASIS Z]
 ```
 
-### Actor and transport syntax
+### Actor and transport operations
 
 ```text
 ACTOR Alice
-ACTOR Bob
 ASSIGN q0 Alice
 SEND q0 Alice Bob
 INTERCEPT q0 Eve
 ```
 
-### Annotation syntax
+### Annotations and control markers
 
 ```text
-LABEL BellPair
-NOTE Eve may disturb the channel here
+LABEL Bell Pair
+NOTE Eve may disturb the channel
 WAIT 1
 BARRIER
 ```
 
-### Macro syntax
+### Macros
 
 ```text
 SUPERPOSE q0
@@ -101,137 +157,136 @@ ENTANGLE q0 q1
 BELL q0 q1
 ```
 
-Macro expansion:
+Current macro expansion rules:
 
 - `SUPERPOSE q0` -> `H q0`
 - `ENTANGLE q0 q1` -> `H q0`, `CNOT q0 q1`
 - `BELL q0 q1` -> `INIT q0`, `INIT q1`, `H q0`, `CNOT q0 q1`
 
-## Parser Behavior
+## Frontend Parser Behavior
 
-The parser:
+The frontend parser is the strictest validation layer in the app. It:
 
-- strips blank lines and comments
-- validates command names
-- validates qubit names like `q0`, `q1`, `q12`
+- validates opcode names
+- validates qubit tokens like `q0`, `q1`, `q12`
 - validates actor names like `Alice`, `Bob`, `Eve_1`
-- validates missing arguments
-- accepts both `MEASURE q0 BASIS X` and `MEASURE q0 [BASIS X]`
-- expands supported macros into primitive instruction objects
-- returns:
-  - `instructions`
-  - `errors`
-  - `warnings`
-  - discovered qubits
-  - discovered actors
+- validates argument counts
+- validates numeric rotation angles
+- validates `MEASURE` basis tokens
+- expands macros and reports expansion warnings
+- returns structured issues instead of failing hard
 
-## Simulation Model
+The parser result powers:
 
-This workspace uses a simplified execution engine instead of full quantum state-vector math.
+- parser feedback cards
+- JSON instruction preview
+- text-to-circuit conversion
+- discovered actor/qubit metadata
 
-Tracked concepts:
+## Custom Engine Behavior
 
-- initialized/uninitialized qubits
-- simple state labels: `0`, `1`, `+`, `-`, `mixed`
+The backend `custom` engine tracks more than just gate order. Each step snapshot can include:
+
+- qubit initialization state
+- simplified state labels: `0`, `1`, `+`, `-`, `mixed`, `uninitialized`
 - superposition flag
-- basic entanglement links
+- entanglement links
 - actor ownership and location
-- send/intercept history
-- random measurement outcomes where appropriate
+- measurement records
+- transport and intercept records
+- Bloch vectors derived from `_MiniSV` when available
 
-Supported backend operations:
+Important runtime notes:
 
-- `INIT`
-- `RESET`
-- `H`
-- `X`
-- `Y`
-- `Z`
-- `CNOT`
-- `SWAP`
-- `MEASURE`
-- `ACTOR`
-- `ASSIGN`
-- `SEND`
-- `INTERCEPT`
-- `LABEL`
-- `NOTE`
-- `WAIT`
-- `BARRIER`
+- The symbolic runtime is intentionally simplified for pedagogy.
+- `_MiniSV` is capped at 12 qubits.
+- `CNOT`, `CZ`, and `TOFFOLI` switch into simplified correlation or entanglement behavior when superposition or prior entanglement is present.
+- `INTERCEPT` can force a hidden Z-basis collapse.
+- `MEASURE BASIS X` collapses through the statevector helper so the returned Bloch vector lands on the X axis rather than the Z axis.
 
-Important simplifications:
+## Circuit Sync Rules
 
-- `CNOT` creates a simple entanglement relation when superposition is involved.
-- `INTERCEPT` can disturb a qubit by forcing a hidden Z-basis collapse.
-- `MEASURE` uses deterministic or random outcomes based on the current simplified label.
-- Bloch vectors are heuristic projections from those simplified labels.
+The visual circuit and text editor are kept in sync, but the conversion is intentionally lossy in a few places.
 
-## Step-by-Step Execution
+### Source to circuit
 
-Each backend execution response includes:
+- leading `INIT` and `RESET` instructions are mapped into circuit initial states until an operational gate appears
+- later `INIT` and `RESET` instructions are approximated as executable gate sequences
+- `MEASURE BASIS X` becomes `H` plus `MEASURE` in the circuit model
+- actor, transport, and annotation instructions advance timeline steps but do not become circuit gates
 
-- `summary`
-- `steps`
-- `final_state`
-- `measurement_results`
-- `warnings`
+### Circuit to source
 
-Each `step` includes:
+- the generated source always starts with `LABEL Circuit Workspace`
+- each qubit gets an `INIT`
+- each circuit column is separated by `BARRIER`
+- display-only gates become `NOTE` lines
 
-- the instruction that ran
-- a human-readable event description
-- the full current execution state snapshot
+This means the circuit surface is best understood as a structural visualization for the quantum portion of a program, not a perfect reversible representation of every workspace instruction.
 
-That state snapshot powers:
+## Catalog, Templates, and Presets
 
-- the timeline highlight
-- the state inspector
-- the measurement panel
-- the transport log
-- the Bloch panel
+The catalog endpoint is the main backend source of truth for:
 
-## Templates
+- syntax reference entries
+- template metadata
+- benchmark profiles
+- architecture notes shown in the docs panel
 
-Integrated templates currently include:
+There is an additional frontend preset layer in `frontend/src/utils/languagePresets.ts` that can substitute engine-specific examples for some template IDs. That layer is partial and should be treated as an augmentation, not the canonical template source.
 
-- Bell Pair Starter
-- BB84 With Eve
-- Teleportation Walkthrough
-- Superdense Coding
-- Grover's Search *(PennyLane-derived)*
-- Quantum Fourier Transform *(PennyLane-derived)*
-- QAOA MaxCut *(PennyLane-derived)*
-- VQE Ansatz (H₂ molecule) *(PennyLane-derived)*
-- Quantum Phase Estimation *(PennyLane-derived)*
+## Benchmarks and Analysis
 
-They are all loaded from the backend catalog so the UI, syntax docs, and backend expectations stay aligned.
+### Benchmarks
 
-## Benchmarks
-
-The benchmark tab runs backend-generated circuit families inspired by the public MQT Bench benchmark repository.
-
-Current families:
+The benchmark endpoint exposes benchmark families backed by `_MiniSV`, including:
 
 - GHZ
 - QFT
 - Grover
 - QAOA
+- VQE
+- QPE
+- W-State
+- Deutsch-Jozsa
 
-The backend reports:
+The current implementation reports CPU and optional GPU metadata, but the benchmark runner itself executes on the built-in CPU-side `_MiniSV` path.
 
-- CPU name
-- CPU core count
-- GPU availability
-- benchmark duration
-- circuit depth
-- gate count
-- engine used
+### Analysis
 
-If GPU execution is available through Aer on the local machine, the benchmark service tries to use it and reports that in the response. Otherwise it falls back to CPU execution.
+The analysis endpoint supports optional modules:
 
-## UI Notes
+- entanglement metrics via `toqito` when installed, otherwise purity-only fallback
+- parameter landscapes with optional matplotlib image output
+- Stim-based stabilizer or QEC runs when `stim` is installed
 
-- The right inspector pane is resizable on desktop.
-- The Bloch spheres support zoom via mouse wheel or trackpad pinch.
-- The active theme is stored in local storage.
-- The mobile layout collapses the two-pane desktop grid into a single column.
+## Current Caveats
+
+These are important for contributors working on the workspace:
+
+- The frontend and backend QPAL parsers are similar but not identical; keep them aligned when changing syntax.
+- The workspace auto-executes debounced source updates, so parser and runtime drift is user-visible immediately.
+- Template presets only cover a subset of catalog templates.
+- GPU selection in the UI is currently more of a capability hint than a guaranteed execution path for the custom workspace engine or benchmark runner.
+- The QuNetSim adapter is event-oriented; it is not a full fidelity network debugger.
+
+## Recommended Maintenance Work
+
+If you continue improving the workspace, these are the highest-value follow-ups:
+
+1. Unify parser validation rules and error handling between `frontend/src/lib/workspace/pseudoParser.ts` and `backend/core/workspace/parser.py`.
+2. Make template engine selection capability-aware instead of switching templates to QuNetSim or OpenQASM presets by template kind alone.
+3. Document or implement the actual meaning of `compute` and `prefer_gpu` across frontend controls and backend execution.
+4. Add end-to-end tests that cover text editing, template loading, engine switching, and build verification.
+
+## Local Verification
+
+Useful commands from the repo root:
+
+```bash
+npm run build
+npm run type-check --prefix frontend
+cd backend && python -m pytest tests/ -v
+```
+
+If you update parser rules or instruction schemas, verify both the frontend parser path and the backend `custom` engine path before merging.
