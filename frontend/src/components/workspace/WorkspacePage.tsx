@@ -50,17 +50,24 @@ const INSPECTOR_TABS = [
   { id: "docs", label: "Docs" },
 ] as const
 const STUDIO_ALIASES: Record<string, string> = {
-  bell: "e91",
-  bell_pair: "e91",
-  ghz: "e91",
   bb84_eavesdrop: "bb84",
   teleportation_simplified: "teleport",
   superdense_simplified: "superdense",
   grover_starter: "grover",
+  grover_search: "grover",
   qft_signal: "qft",
+  qft_3qubit: "qft",
   qaoa_round: "qaoa",
+  qaoa_maxcut: "qaoa",
   qft3: "qft",
   superpos: "qwalk",
+  quantum_walk_1d: "qwalk",
+  vqe_h2: "vqe",
+  qpe_simple: "qpe",
+  shor_factorization: "shor",
+  deutsch_jozsa: "dj",
+  bernstein_vazirani: "bv",
+  qec_3qubit_repetition: "qec",
 }
 
 const DRAWER_TEMPLATE_GROUPS = [
@@ -502,10 +509,12 @@ export function WorkspacePage() {
 
   function applySelection(option: WorkspaceModelOption) {
     setSelectedModelValue(option.value)
-    setActiveInspector("studio")
 
     if (option.studioId) {
       selectLearningExperience(option.studioId)
+      setActiveInspector("studio")
+    } else {
+      setActiveInspector("state")
     }
 
     if (option.source === "template" && option.template) {
@@ -914,7 +923,7 @@ export function WorkspacePage() {
             style={{ display: "flex", flexDirection: "column" }}
             action={
               <div style={tabRailStyle}>
-                {INSPECTOR_TABS.map((tab) => (
+                {INSPECTOR_TABS.filter((tab) => tab.id !== "studio" || selectedModel?.studioId).map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveInspector(tab.id)}
