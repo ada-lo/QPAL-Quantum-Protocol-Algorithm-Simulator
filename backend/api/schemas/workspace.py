@@ -192,6 +192,7 @@ class LandscapeData(BaseModel):
     angles_y: list[float] = Field(default_factory=list)
     energies: list[list[float]] = Field(default_factory=list)
     circuit_type: str = "vqe"
+    preset_label: str | None = None
     plot_base64: str | None = None
 
 
@@ -215,6 +216,8 @@ class WorkspaceAnalysisRequest(BaseModel):
     stim_circuit: str | None = "ghz"
     stim_noise: float | None = 0.0
     stim_shots: int | None = 1000
+    circuit_gates: list[dict[str, Any]] | None = None
+    preset_label: str | None = None
 
 
 class WorkspaceAnalysisResponse(BaseModel):

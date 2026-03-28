@@ -83,13 +83,93 @@ def compute_entanglement(sv: _MiniSV) -> EntanglementMetrics:
 
 
 # ── Variational Landscape (orqviz) ─────────────────────────────────────────
+_ROTATION_GATES = {"RX", "RY", "RZ"}
+_GATE_DISPATCH = {
+    "H": lambda sv, q, _tq: sv.apply_h(q),
+    "X": lambda sv, q, _tq: sv.apply_x(q),
+    "Y": lambda sv, q, _tq: sv.apply_y(q),
+    "Z": lambda sv, q, _tq: sv.apply_z(q),
+    "S": lambda sv, q, _tq: sv.apply_s(q),
+    "T": lambda sv, q, _tq: sv.apply_t(q),
+    "SDG": lambda sv, q, _tq: sv.apply_sdg(q),
+    "TDG": lambda sv, q, _tq: sv.apply_tdg(q),
+    "SX": lambda sv, q, _tq: sv.apply_sx(q),
+    "CNOT": lambda sv, q, tq: sv.apply_cnot(q, tq),
+    "CZ": lambda sv, q, tq: sv.apply_cz(q, tq),
+    "SWAP": lambda sv, q, tq: sv.apply_swap(q, tq),
+}
+
+
+def _apply_gates_from_preset(
+    sv: _MiniSV,
+    gates: list[dict],
+    theta1: float,
+    theta2: float,
+) -> None:
+    """Apply a preset gate list onto _MiniSV, substituting variational angles.
+
+    The first rotational gate (RX/RY/RZ) encountered uses theta1, the second
+    uses theta2.  Non-rotational gates are applied directly.
+    """
+    rotation_index = 0
+    for gate in gates:
+        gate_id = gate.get("gateId", "").upper()
+        qubit = int(gate.get("qubit", 0))
+        target_qubit = gate.get("targetQubit")
+        tq = int(target_qubit) if target_qubit is not None else 0
+
+        if gate_id in _ROTATION_GATES:
+            angle = theta1 if rotation_index == 0 else theta2
+            rotation_index += 1
+            if gate_id == "RX":
+                sv.apply_rx(qubit, angle)
+            elif gate_id == "RY":
+                sv.apply_ry(qubit, angle)
+            else:
+                sv.apply_rz(qubit, angle)
+        elif gate_id in _GATE_DISPATCH:
+            _GATE_DISPATCH[gate_id](sv, qubit, tq)
+        elif gate_id == "TOFFOLI" and len(gate.get("controlQubits", [])) >= 2:
+            sv.apply_toffoli(
+                int(gate["controlQubits"][0]),
+                int(gate["controlQubits"][1]),
+                qubit,
+            )
+
 
 def compute_landscape(
     n_qubits: int,
     circuit_type: str = "vqe",
     grid_points: int = 20,
+    circuit_gates: list[dict] | None = None,
+    preset_label: str | None = None,
 ) -> LandscapeData:
-    """Sweep two variational parameters and compute the energy surface."""
+    """Sweep two variational parameters and compute the energy surface.
+
+    When *circuit_gates* is provided the sweep is performed over that gate list,
+    inserting two synthetic RY rotations if no rotational gates (RX/RY/RZ) are
+    present.  Otherwise the existing hardcoded VQE/QAOA toy circuits are used.
+    """
+    use_preset = circuit_gates is not None and len(circuit_gates) > 0
+
+    # If the preset contains no rotational gates, prepend two synthetic RYs
+    if use_preset:
+        has_rotations = any(
+            g.get("gateId", "").upper() in _ROTATION_GATES for g in circuit_gates  # type: ignore[union-attr]
+        )
+        if not has_rotations:
+            q0 = 0
+            q1 = min(1, n_qubits - 1)
+            circuit_gates = [
+                {"gateId": "RY", "qubit": q0, "step": -2},
+                {"gateId": "RY", "qubit": q1, "step": -1},
+                *circuit_gates,  # type: ignore[list-item]
+            ]
+
+    display_label = (
+        preset_label or "Preset"
+    ) if use_preset else circuit_type.upper()
+
     angles_x: list[float] = []
     angles_y: list[float] = []
     energies: list[list[float]] = []
@@ -108,7 +188,9 @@ def compute_landscape(
             for q in range(n_qubits):
                 sv.ensure_qubit(q)
 
-            if circuit_type == "vqe":
+            if use_preset:
+                _apply_gates_from_preset(sv, circuit_gates, theta1, theta2)  # type: ignore[arg-type]
+            elif circuit_type == "vqe":
                 sv.apply_ry(0, theta1)
                 sv.apply_ry(1, theta2)
                 if n_qubits > 1:
@@ -123,7 +205,7 @@ def compute_landscape(
                 sv.apply_rx(0, theta2)
                 sv.apply_rx(1, theta2)
 
-            # Compute <Z⊗Z> expectation value
+            # Compute ⟨Z⊗Z⟩ expectation value
             energy = 0.0
             dim = 1 << sv.n
             for k in range(dim):
@@ -135,7 +217,7 @@ def compute_landscape(
             row.append(round(energy, 6))
         energies.append(row)
 
-    # Try to use orqviz for a PNG plot
+    # Try to use matplotlib for a PNG plot
     plot_base64: str | None = None
     try:
         import matplotlib
@@ -150,7 +232,7 @@ def compute_landscape(
         fig.colorbar(c, ax=ax, label="⟨Z⊗Z⟩")
         ax.set_xlabel("θ₂")
         ax.set_ylabel("θ₁")
-        ax.set_title(f"{circuit_type.upper()} Energy Landscape ({n_qubits}q)")
+        ax.set_title(f"{display_label} Energy Landscape ({n_qubits}q)")
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=100, bbox_inches="tight")
@@ -164,7 +246,8 @@ def compute_landscape(
         angles_x=angles_x,
         angles_y=angles_y,
         energies=energies,
-        circuit_type=circuit_type,
+        circuit_type="preset" if use_preset else circuit_type,
+        preset_label=preset_label if use_preset else None,
         plot_base64=plot_base64,
     )
 
@@ -269,6 +352,8 @@ def run_analysis(req: WorkspaceAnalysisRequest) -> WorkspaceAnalysisResponse:
             n_qubits=req.qubits or 2,
             circuit_type=req.landscape_circuit or "vqe",
             grid_points=req.landscape_grid or 20,
+            circuit_gates=req.circuit_gates,
+            preset_label=req.preset_label,
         )
 
     if req.run_stim:

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 
 interface EntanglementMetrics {
@@ -14,6 +14,7 @@ interface LandscapeData {
   angles_y: number[]
   energies: number[][]
   circuit_type: string
+  preset_label: string | null
   plot_base64: string | null
 }
 
@@ -33,31 +34,67 @@ interface AnalysisResponse {
   stim: StimResult | null
 }
 
-export default function WorkspaceAnalysisPanel() {
+interface PresetGate {
+  gateId: string
+  qubit: number
+  step: number
+  targetQubit?: number
+}
+
+interface AnalysisPanelProps {
+  presetLabel?: string | null
+  presetGates?: PresetGate[] | null
+  presetQubits?: number | null
+}
+
+export default function WorkspaceAnalysisPanel({
+  presetLabel = null,
+  presetGates = null,
+  presetQubits = null,
+}: AnalysisPanelProps) {
+  const hasPreset = presetGates !== null && presetGates.length > 0
+
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Settings
-  const [qubits, setQubits] = useState(2)
+  const [qubits, setQubits] = useState(presetQubits ?? 2)
   const [runEnt, setRunEnt] = useState(true)
   const [runLandscape, setRunLandscape] = useState(false)
   const [runStim, setRunStim] = useState(false)
   const [stimNoise, setStimNoise] = useState(0.01)
-  const [landscapeType, setLandscapeType] = useState('vqe')
+  const [landscapeType, setLandscapeType] = useState(hasPreset ? 'preset' : 'vqe')
+
+  // Sync qubits and landscapeType when the selected preset changes
+  useEffect(() => {
+    if (presetQubits) setQubits(presetQubits)
+    setLandscapeType(hasPreset ? 'preset' : 'vqe')
+    // Reset previous results when preset changes
+    setResult(null)
+    setError(null)
+  }, [presetLabel, presetQubits, hasPreset])
 
   const runAnalysis = async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await axios.post<AnalysisResponse>('/api/workspace/analyze', {
+      const payload: Record<string, unknown> = {
         qubits,
         run_entanglement: runEnt,
         run_landscape: runLandscape,
         run_stim: runStim,
         stim_noise: stimNoise,
-        landscape_circuit: landscapeType,
-      })
+        landscape_circuit: landscapeType === 'preset' ? 'preset' : landscapeType,
+      }
+
+      // Attach active preset gate list when using preset landscape
+      if (landscapeType === 'preset' && hasPreset) {
+        payload.circuit_gates = presetGates
+        payload.preset_label = presetLabel
+      }
+
+      const res = await axios.post<AnalysisResponse>('/api/workspace/analyze', payload)
       setResult(res.data)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Analysis failed')
@@ -65,6 +102,12 @@ export default function WorkspaceAnalysisPanel() {
       setLoading(false)
     }
   }
+
+  const landscapeHeading = result?.landscape
+    ? result.landscape.preset_label
+      ? `📐 Variational Landscape (${result.landscape.preset_label})`
+      : `📐 Variational Landscape (${result.landscape.circuit_type.toUpperCase()})`
+    : '📐 Variational Landscape'
 
   return (
     <div className="analysis-panel" style={{ padding: '1rem' }}>
@@ -120,9 +163,17 @@ export default function WorkspaceAnalysisPanel() {
           <select value={landscapeType} onChange={e => setLandscapeType(e.target.value)}
             style={{ marginLeft: '0.5rem', background: 'var(--bg-tertiary, #1e293b)', color: 'inherit', border: '1px solid var(--border, #334155)', borderRadius: '4px', padding: '2px 6px' }}
           >
-            <option value="vqe">VQE</option>
-            <option value="qaoa">QAOA</option>
+            {hasPreset && (
+              <option value="preset">{presetLabel ?? 'Active Preset'}</option>
+            )}
+            <option value="vqe">Demo VQE</option>
+            <option value="qaoa">Demo QAOA</option>
           </select>
+          {!hasPreset && (
+            <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted, #64748b)', fontStyle: 'italic' }}>
+              Load a circuit preset for preset-specific landscapes
+            </span>
+          )}
         </div>
       )}
 
@@ -184,8 +235,13 @@ export default function WorkspaceAnalysisPanel() {
       {result?.landscape && (
         <div style={{ background: 'var(--bg-tertiary, #1e293b)', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem' }}>
           <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: 'var(--text-primary, #e2e8f0)' }}>
-            📐 Variational Landscape ({result.landscape.circuit_type.toUpperCase()})
+            {landscapeHeading}
           </h4>
+          {!result.landscape.preset_label && result.landscape.circuit_type !== 'preset' && (
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748b)', fontStyle: 'italic', margin: '0 0 0.5rem' }}>
+              Demo landscape — independent of the selected preset
+            </p>
+          )}
           {result.landscape.plot_base64 ? (
             <img
               src={`data:image/png;base64,${result.landscape.plot_base64}`}

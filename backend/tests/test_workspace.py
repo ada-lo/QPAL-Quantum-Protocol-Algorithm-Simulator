@@ -179,4 +179,83 @@ def test_analysis_endpoint():
     assert len(result.landscape.angles_x) > 0
     assert len(result.landscape.angles_y) > 0
     assert len(result.landscape.energies) > 0
+    assert result.landscape.circuit_type == "vqe"
+    assert result.landscape.preset_label is None
+
+
+def test_analysis_with_custom_gates():
+    """Landscape computed with custom circuit_gates differs from default VQE."""
+    from core.workspace.analysis import run_analysis
+    from api.schemas.workspace import WorkspaceAnalysisRequest
+
+    # Default VQE landscape (no circuit_gates)
+    req_default = WorkspaceAnalysisRequest(
+        qubits=2, run_landscape=True, landscape_circuit="vqe", landscape_grid=5,
+    )
+    result_default = run_analysis(req_default)
+    assert result_default.landscape is not None
+
+    # Custom gates: a QFT-like circuit that structurally differs from VQE
+    # (H + S + T + H + S + H + SWAP) — prepending RYs still yields different topology
+    qft_gates = [
+        {"gateId": "H", "qubit": 0, "step": 0},
+        {"gateId": "S", "qubit": 0, "step": 1},
+        {"gateId": "T", "qubit": 0, "step": 2},
+        {"gateId": "H", "qubit": 1, "step": 3},
+        {"gateId": "S", "qubit": 1, "step": 4},
+        {"gateId": "H", "qubit": 0, "step": 5},
+        {"gateId": "SWAP", "qubit": 0, "step": 6, "targetQubit": 1},
+    ]
+    req_custom = WorkspaceAnalysisRequest(
+        qubits=2,
+        run_landscape=True,
+        landscape_grid=5,
+        circuit_gates=qft_gates,
+        preset_label="QFT",
+    )
+    result_custom = run_analysis(req_custom)
+    assert result_custom.landscape is not None
+    assert result_custom.landscape.circuit_type == "preset"
+    assert result_custom.landscape.preset_label == "QFT"
+
+    # The energy grids must differ (proving the gates influence the result)
+    assert result_default.landscape.energies != result_custom.landscape.energies
+
+
+def test_analysis_different_presets_differ():
+    """Two different preset gate lists produce distinct landscape grids."""
+    from core.workspace.analysis import run_analysis
+    from api.schemas.workspace import WorkspaceAnalysisRequest
+
+    # Simple: H + CNOT (Bell)
+    bell_gates = [
+        {"gateId": "H", "qubit": 0, "step": 0},
+        {"gateId": "CNOT", "qubit": 0, "step": 1, "targetQubit": 1},
+    ]
+    # Complex: H + S + T + H + S + H + SWAP (QFT-like)
+    qft_gates = [
+        {"gateId": "H", "qubit": 0, "step": 0},
+        {"gateId": "S", "qubit": 0, "step": 1},
+        {"gateId": "T", "qubit": 0, "step": 2},
+        {"gateId": "H", "qubit": 1, "step": 3},
+        {"gateId": "S", "qubit": 1, "step": 4},
+        {"gateId": "H", "qubit": 0, "step": 5},
+        {"gateId": "SWAP", "qubit": 0, "step": 6, "targetQubit": 1},
+    ]
+
+    req_bell = WorkspaceAnalysisRequest(
+        qubits=2, run_landscape=True, landscape_grid=5,
+        circuit_gates=bell_gates, preset_label="Bell",
+    )
+    req_qft = WorkspaceAnalysisRequest(
+        qubits=2, run_landscape=True, landscape_grid=5,
+        circuit_gates=qft_gates, preset_label="QFT",
+    )
+
+    result_bell = run_analysis(req_bell)
+    result_qft = run_analysis(req_qft)
+
+    assert result_bell.landscape is not None
+    assert result_qft.landscape is not None
+    assert result_bell.landscape.energies != result_qft.landscape.energies
 

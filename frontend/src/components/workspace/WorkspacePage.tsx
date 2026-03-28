@@ -249,6 +249,7 @@ export function WorkspacePage() {
   const [docsOpen, setDocsOpen] = useState(false)
   const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false)
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
+  const [presetPickerValue, setPresetPickerValue] = useState("")
   const [rightPaneWidth, setRightPaneWidth] = useState(430)
   const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem("workspace-theme") === "dark" ? "dark" : "light"))
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -322,6 +323,7 @@ export function WorkspacePage() {
   }, [catalog])
 
   const selectedModel = selectionOptions.find((option) => option.value === selectedModelValue) ?? null
+  const presetSelectionOptions = useMemo(() => selectionOptions.filter((option) => option.source === "preset" && option.preset), [selectionOptions])
   const filteredTemplates = useMemo(() => filterRelatedTemplates(selectedModel, catalog?.templates ?? []), [catalog?.templates, selectedModel])
   const filteredBenchmarks = useMemo(() => filterRelatedBenchmarks(selectedModel, catalog?.benchmarks ?? []), [catalog?.benchmarks, selectedModel])
   const templateById = useMemo(() => {
@@ -507,7 +509,33 @@ export function WorkspacePage() {
     }
   }
 
+  function applyPresetSelection(option: WorkspaceModelOption) {
+    if (!option.preset) return
+
+    setSelectedModelValue(option.value)
+    setActiveInspector("studio")
+
+    if (option.studioId) {
+      selectLearningExperience(option.studioId)
+    }
+
+    loadPreset(option.preset.gates, option.preset.nQubits)
+    setSource(
+      circuitSnapshotToProgram({
+        nQubits: option.preset.nQubits,
+        gates: option.preset.gates.map((gate, index) => ({ ...gate, id: `preset-${option.preset?.id}-${index}` })),
+        initialStates: Array.from({ length: option.preset.nQubits }, () => "|0⟩" as const),
+      }),
+    )
+  }
+
   function applySelection(option: WorkspaceModelOption) {
+    if (option.preset) {
+      setActiveWorkspaceView("pseudocode")
+      applyPresetSelection(option)
+      return
+    }
+
     setSelectedModelValue(option.value)
 
     if (option.studioId) {
@@ -542,16 +570,6 @@ export function WorkspacePage() {
       return
     }
 
-    if (option.preset) {
-      loadPreset(option.preset.gates, option.preset.nQubits)
-      setSource(
-        circuitSnapshotToProgram({
-          nQubits: option.preset.nQubits,
-          gates: option.preset.gates.map((gate, index) => ({ ...gate, id: `preset-${option.preset?.id}-${index}` })),
-          initialStates: Array.from({ length: option.preset.nQubits }, () => "|0⟩" as const),
-        }),
-      )
-    }
   }
 
   function handleResizeStart(event: ReactPointerEvent<HTMLDivElement>) {
@@ -944,7 +962,13 @@ export function WorkspacePage() {
             {activeInspector === "state" && <StateInspector state={selectedState} instructions={parsed.instructions} stepLabel={selectedStep?.event ?? "No active step"} />}
             {activeInspector === "bloch" && <BlochInspector state={selectedState} />}
             {activeInspector === "docs" && <DocsPanel syntax={catalog?.syntax ?? []} templates={filteredTemplates} notes={catalog?.architecture_notes ?? []} context={inspectorContext} />}
-            {activeInspector === "analysis" && <WorkspaceAnalysisPanel />}
+            {activeInspector === "analysis" && (
+              <WorkspaceAnalysisPanel
+                presetLabel={selectedModel?.title ?? null}
+                presetGates={selectedModel?.preset?.gates ?? null}
+                presetQubits={selectedModel?.preset?.nQubits ?? null}
+              />
+            )}
           </SectionCard>
         </aside>
       </div>
@@ -1370,6 +1394,14 @@ const primaryButtonStyle: CSSProperties = {
 const tabRailStyle: CSSProperties = {
   display: "flex",
   gap: 8,
+  flexWrap: "wrap",
+}
+
+const workspaceViewActionStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  gap: 10,
   flexWrap: "wrap",
 }
 
