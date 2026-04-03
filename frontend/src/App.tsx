@@ -1,5 +1,9 @@
 import { Component, type ErrorInfo, type ReactNode } from "react"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
+import { AccountPage } from "@/components/auth/AccountPage"
+import { AuthPage } from "@/components/auth/AuthPage"
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
+import { LandingPage } from "@/components/landing/LandingPage"
 import { WorkspacePage } from "@/components/workspace/WorkspacePage"
 import { WorkspaceDocsPage } from "@/components/workspace/WorkspaceDocsPage"
 
@@ -103,8 +107,28 @@ export default function App() {
     <BrowserRouter>
       <AppErrorBoundary>
         <Routes>
-          <Route path="/" element={<WorkspacePage />} />
-          <Route path="/docs" element={<WorkspaceDocsPage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/auth/*" element={<AuthPage />} />
+          <Route
+            path="/account/*"
+            element={
+              <ProtectedRoute>
+                <AccountPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace"
+            element={
+              <ProtectedRoute>
+                <WorkspacePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/docs"
+            element={<WorkspaceDocsPage />}
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppErrorBoundary>

@@ -1,12 +1,15 @@
 import * as Accordion from "@radix-ui/react-accordion"
 import * as Dialog from "@radix-ui/react-dialog"
 import * as Tooltip from "@radix-ui/react-tooltip"
-import { BookOpenText, ChevronDown, CircleHelp, Cpu, Info, Menu, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
+import { UserButton } from "@neondatabase/neon-js/auth/react/ui"
+import { BookOpenText, ChevronDown, CircleHelp, Cpu, House, Info, Menu, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { Link } from "react-router-dom"
 import { Editor } from "@monaco-editor/react"
 
+import { SignOutButton } from "@/components/auth/SignOutButton"
 import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
+import { useThemeMode } from "@/hooks/useThemeMode"
 import { LEARNING_EXPERIENCES, type LearningExperience } from "@/lib/quantum/learningCatalog"
 import { PRESETS, type CircuitPreset } from "@/lib/quantum/presets"
 import { fetchWorkspaceCatalog, runWorkspaceBenchmarks, simulateWorkspaceProgram } from "@/lib/workspace/api"
@@ -138,7 +141,6 @@ const DRAWER_TEMPLATE_GROUPS = [
 ] as const
 
 type InspectorTab = (typeof INSPECTOR_TABS)[number]["id"]
-type ThemeMode = "light" | "dark"
 
 interface WorkspaceModelOption {
   value: string
@@ -251,7 +253,7 @@ export function WorkspacePage() {
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
   const [presetPickerValue, setPresetPickerValue] = useState("")
   const [rightPaneWidth, setRightPaneWidth] = useState(430)
-  const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem("workspace-theme") === "dark" ? "dark" : "light"))
+  const { theme, setTheme } = useThemeMode()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const executionTokenRef = useRef(0)
   // Sync guard: set to true while the parser is writing to the circuit store
@@ -336,11 +338,6 @@ export function WorkspacePage() {
   const inspectorContext = selectedModel
     ? { title: selectedModel.title, description: selectedModel.description, kind: selectedModel.kindLabel }
     : null
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem("workspace-theme", theme)
-  }, [theme])
 
   useEffect(() => {
     let active = true
@@ -531,7 +528,6 @@ export function WorkspacePage() {
 
   function applySelection(option: WorkspaceModelOption) {
     if (option.preset) {
-      setActiveWorkspaceView("pseudocode")
       applyPresetSelection(option)
       return
     }
@@ -672,6 +668,10 @@ export function WorkspacePage() {
             </Tooltip.Provider>
           </div>
           <div style={navControlsStyle}>
+            <Link to="/" style={headerLinkButtonStyle}>
+              <House size={14} />
+              Home
+            </Link>
             <button
               type="button"
               style={{ ...headerExecButtonStyle, borderColor: "var(--accent-green)", color: "var(--accent-green)" }}
@@ -691,6 +691,10 @@ export function WorkspacePage() {
             </button>
             <ThemeToggleButton label="Dark" active={theme === "dark"} onClick={() => setTheme("dark")} />
             <ThemeToggleButton label="Light" active={theme === "light"} onClick={() => setTheme("light")} />
+            <SignOutButton style={headerExecButtonStyle} />
+            <div style={authUserButtonShellStyle}>
+              <UserButton />
+            </div>
           </div>
         </nav>
 
@@ -1206,6 +1210,16 @@ const headerExecButtonStyle: CSSProperties = {
   gap: 6,
   fontSize: 12,
   fontWeight: 700,
+}
+
+const headerLinkButtonStyle: CSSProperties = {
+  ...headerExecButtonStyle,
+  textDecoration: "none",
+}
+
+const authUserButtonShellStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
 }
 
 const drawerOverlayStyle: CSSProperties = {

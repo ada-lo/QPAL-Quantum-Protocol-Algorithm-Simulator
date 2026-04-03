@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from api.deps.auth import require_authenticated_user
 from api.schemas.workspace import (
     WorkspaceAnalysisRequest,
     WorkspaceAnalysisResponse,
@@ -16,7 +17,10 @@ from core.workspace.executor import simulate_workspace
 from core.workspace.parser import parse_pseudocode
 from core.engines import execute_qasm, execute_qunetsim
 
-router = APIRouter(prefix="/workspace", tags=["workspace"])
+router = APIRouter(
+    prefix="/workspace",
+    tags=["workspace"],
+)
 
 
 @router.get("/catalog", response_model=WorkspaceCatalogResponse)
@@ -24,7 +28,7 @@ async def workspace_catalog() -> WorkspaceCatalogResponse:
     return get_workspace_catalog()
 
 
-@router.post("/simulate", response_model=WorkspaceSimulateResponse)
+@router.post("/simulate", response_model=WorkspaceSimulateResponse, dependencies=[Depends(require_authenticated_user)])
 async def workspace_simulate(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
     if req.engine == "custom":
         # Parse QPAL pseudocode into structured instructions, then execute
@@ -38,11 +42,11 @@ async def workspace_simulate(req: WorkspaceSimulateRequest) -> WorkspaceSimulate
 
 
 
-@router.post("/benchmarks", response_model=WorkspaceBenchmarkResponse)
+@router.post("/benchmarks", response_model=WorkspaceBenchmarkResponse, dependencies=[Depends(require_authenticated_user)])
 async def workspace_benchmarks(req: WorkspaceBenchmarkRequest) -> WorkspaceBenchmarkResponse:
     return run_benchmarks(req)
 
 
-@router.post("/analyze", response_model=WorkspaceAnalysisResponse)
+@router.post("/analyze", response_model=WorkspaceAnalysisResponse, dependencies=[Depends(require_authenticated_user)])
 async def workspace_analyze(req: WorkspaceAnalysisRequest) -> WorkspaceAnalysisResponse:
     return run_analysis(req)
