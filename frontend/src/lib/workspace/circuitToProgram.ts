@@ -73,7 +73,9 @@ export function circuitSnapshotToProgram(snapshot: CircuitProgramSnapshot) {
   const steps = Array.from(grouped.keys()).sort((left, right) => left - right)
   steps.forEach((step, index) => {
     const gates = (grouped.get(step) ?? []).slice().sort((left, right) => left.qubit - right.qubit)
-    if (index > 0) {
+    const previousStep = index > 0 ? steps[index - 1] : null
+    const gap = previousStep === null ? 0 : Math.max(step - previousStep - 1, 0)
+    for (let offset = 0; offset < gap; offset += 1) {
       lines.push("BARRIER")
     }
     gates.forEach((gate) => {

@@ -12,12 +12,62 @@ const PAD_LEFT = 8
 const PAD_TOP = 16
 const MAX_STEPS = 24
 
+type GatePlacement = Omit<CircuitGate, "id">
+
 function isConnectingGate(id: GateId) {
   return TWO_QUBIT_GATES.includes(id) || THREE_QUBIT_GATES.includes(id)
 }
 
-function isDisplayGate(id: GateId) {
-  return ["CHANCE", "AMPS", "BLOCH", "DENSITY"].includes(id)
+function occupiedQubitsForGate(gate: Pick<CircuitGate, "qubit" | "targetQubit" | "controlQubit">) {
+  return [gate.qubit, gate.controlQubit, gate.targetQubit].filter((value): value is number => value !== undefined)
+}
+
+function buildPlacedGate(gateId: GateId, qubits: number[], step: number): GatePlacement | null {
+  if (gateId === "TOFFOLI") {
+    if (qubits.length !== 3) return null
+    const [controlA, controlB, target] = qubits
+    return {
+      gateId,
+      qubit: controlA,
+      controlQubit: controlB,
+      targetQubit: target,
+      step,
+    }
+  }
+
+  if (GATES[gateId]?.qubits === 2) {
+    if (qubits.length !== 2) return null
+    const [control, target] = qubits
+    return {
+      gateId,
+      qubit: control,
+      targetQubit: target,
+      step,
+    }
+  }
+
+  if (GATES[gateId]?.qubits === 1) {
+    return {
+      gateId,
+      qubit: qubits[0],
+      step,
+      angle: GATES[gateId].hasAngle ? Math.PI / 2 : undefined,
+    }
+  }
+
+  return null
+}
+
+function shiftGate(gate: CircuitGate, newQubit: number, newStep: number): GatePlacement {
+  const delta = newQubit - gate.qubit
+  return {
+    gateId: gate.gateId,
+    qubit: newQubit,
+    step: newStep,
+    angle: gate.angle,
+    targetQubit: gate.targetQubit !== undefined ? gate.targetQubit + delta : undefined,
+    controlQubit: gate.controlQubit !== undefined ? gate.controlQubit + delta : undefined,
+  }
 }
 
 export function CircuitGrid() {
@@ -34,50 +84,73 @@ export function CircuitGrid() {
     hoveredCell,
     dragState,
     setDragState,
+    setSelectedGate,
   } = useCircuitStore()
 
   const totalW = PAD_LEFT + QUBIT_LABEL_W + MAX_STEPS * CELL_W + 20
   const totalH = PAD_TOP + nQubits * CELL_H + 20
 
-  const gateMap = useMemo(() => {
+  const occupiedCellMap = useMemo(() => {
     const map = new Map<string, CircuitGate>()
     for (const gate of gates) {
-      map.set(`${gate.qubit}-${gate.step}`, gate)
+      for (const qubit of occupiedQubitsForGate(gate)) {
+        map.set(`${qubit}-${gate.step}`, gate)
+      }
     }
     return map
   }, [gates])
 
-  function handleCellClick(qubit: number, step: number) {
-    if (!selectedGate) return
-    const key = `${qubit}-${step}`
-    const occupied = gateMap.has(key)
+  function isCellOccupied(qubit: number, step: number, ignoredGateId?: string) {
+    const occupant = occupiedCellMap.get(`${qubit}-${step}`)
+    return Boolean(occupant && occupant.id !== ignoredGateId)
+  }
 
-    if (isConnectingGate(selectedGate)) {
-      if (!pendingConnection) {
-        if (!occupied) setPendingConnection({ gateId: selectedGate, controlQubit: qubit, step })
-      } else if (pendingConnection.step === step && qubit !== pendingConnection.controlQubit) {
-        if (!occupied) {
-          addGate({
-            gateId: pendingConnection.gateId,
-            qubit: Math.min(qubit, pendingConnection.controlQubit),
-            step,
-            targetQubit: Math.max(qubit, pendingConnection.controlQubit),
-          })
-        }
-        setPendingConnection(null)
-      } else {
-        setPendingConnection(null)
-      }
+  function canPlaceGate(gate: GatePlacement, ignoredGateId?: string) {
+    const qubits = occupiedQubitsForGate(gate)
+    return qubits.every((qubit) => qubit >= 0 && qubit < nQubits && !isCellOccupied(qubit, gate.step, ignoredGateId))
+  }
+
+  function advancePendingConnection(gateId: GateId, qubit: number, step: number) {
+    if (isCellOccupied(qubit, step)) {
+      setPendingConnection(null)
       return
     }
 
-    if (!occupied) {
-      addGate({
-        gateId: selectedGate,
-        qubit,
-        step,
-        angle: GATES[selectedGate].hasAngle ? Math.PI / 2 : undefined,
-      })
+    const requiredQubits = GATES[gateId]?.qubits ?? 1
+    if (!pendingConnection || pendingConnection.gateId !== gateId || pendingConnection.step !== step) {
+      setPendingConnection({ gateId, qubits: [qubit], step })
+      return
+    }
+
+    if (pendingConnection.qubits.includes(qubit)) {
+      setPendingConnection(null)
+      return
+    }
+
+    const nextQubits = [...pendingConnection.qubits, qubit]
+    if (nextQubits.length < requiredQubits) {
+      setPendingConnection({ gateId, qubits: nextQubits, step })
+      return
+    }
+
+    const nextGate = buildPlacedGate(gateId, nextQubits, step)
+    if (nextGate && canPlaceGate(nextGate)) {
+      addGate(nextGate)
+    }
+    setPendingConnection(null)
+  }
+
+  function handleCellClick(qubit: number, step: number) {
+    if (!selectedGate) return
+
+    if (isConnectingGate(selectedGate)) {
+      advancePendingConnection(selectedGate, qubit, step)
+      return
+    }
+
+    const nextGate = buildPlacedGate(selectedGate, [qubit], step)
+    if (nextGate && canPlaceGate(nextGate)) {
+      addGate(nextGate)
     }
   }
 
@@ -92,16 +165,24 @@ export function CircuitGrid() {
     const sourceGateId = event.dataTransfer.getData("application/source-gate-id")
 
     if (sourceGateId) {
-      moveGate(sourceGateId, qubit, step)
+      const sourceGate = gates.find((gate) => gate.id === sourceGateId)
+      if (sourceGate) {
+        const nextGate = shiftGate(sourceGate, qubit, step)
+        if (canPlaceGate(nextGate, sourceGateId)) {
+          moveGate(sourceGateId, qubit, step)
+        }
+      }
     } else if (gateId) {
-      const key = `${qubit}-${step}`
-      if (!gateMap.has(key)) {
-        addGate({
-          gateId,
-          qubit,
-          step,
-          angle: GATES[gateId]?.hasAngle ? Math.PI / 2 : undefined,
-        })
+      if (isConnectingGate(gateId)) {
+        if (selectedGate !== gateId) {
+          setSelectedGate(gateId)
+        }
+        advancePendingConnection(gateId, qubit, step)
+      } else {
+        const nextGate = buildPlacedGate(gateId, [qubit], step)
+        if (nextGate && canPlaceGate(nextGate)) {
+          addGate(nextGate)
+        }
       }
     }
 
@@ -239,11 +320,12 @@ export function CircuitGrid() {
           }),
         )}
 
-        {pendingConnection && (
+        {pendingConnection?.qubits.map((pendingQubit, index) => (
           <circle
+            key={`pending-${pendingQubit}-${index}`}
             cx={PAD_LEFT + QUBIT_LABEL_W + pendingConnection.step * CELL_W + CELL_W / 2}
-            cy={PAD_TOP + pendingConnection.controlQubit * CELL_H + CELL_H / 2}
-            r={10}
+            cy={PAD_TOP + pendingQubit * CELL_H + CELL_H / 2}
+            r={index === pendingConnection.qubits.length - 1 ? 10 : 7}
             fill="none"
             stroke="var(--accent-cyan)"
             strokeWidth={2}
@@ -251,7 +333,7 @@ export function CircuitGrid() {
           >
             <animate attributeName="stroke-dashoffset" from="0" to="12" dur="0.8s" repeatCount="indefinite" />
           </circle>
-        )}
+        ))}
 
         {gates.map((gate) => {
           const def = GATES[gate.gateId]
@@ -299,12 +381,11 @@ export function CircuitGrid() {
             )
           }
 
-          if (gate.targetQubit !== undefined) {
-            const cy2 = PAD_TOP + gate.targetQubit * CELL_H + CELL_H / 2
-            const minY = Math.min(cy, cy2)
-            const maxY = Math.max(cy, cy2)
-            const controlY = gate.qubit < gate.targetQubit ? cy : cy2
-            const targetY = gate.qubit < gate.targetQubit ? cy2 : cy
+          if (gate.gateId === "TOFFOLI" && gate.controlQubit !== undefined && gate.targetQubit !== undefined) {
+            const controlBY = PAD_TOP + gate.controlQubit * CELL_H + CELL_H / 2
+            const targetY = PAD_TOP + gate.targetQubit * CELL_H + CELL_H / 2
+            const minY = Math.min(cy, controlBY, targetY)
+            const maxY = Math.max(cy, controlBY, targetY)
 
             return (
               <g
@@ -317,34 +398,63 @@ export function CircuitGrid() {
                 onDragEnd={(event) => handleGateDragEnd(event)}
               >
                 <line x1={cx} y1={minY} x2={cx} y2={maxY} stroke={def.color} strokeWidth={1.5} />
-                <circle cx={cx} cy={controlY} r={5} fill={def.color} />
-                {gate.gateId === "CNOT" ? (
-                  <g>
-                    <circle cx={cx} cy={targetY} r={12} fill="var(--bg-card)" stroke={def.color} strokeWidth={1.5} />
-                    <line x1={cx - 8} y1={targetY} x2={cx + 8} y2={targetY} stroke={def.color} strokeWidth={1.5} />
-                    <line x1={cx} y1={targetY - 8} x2={cx} y2={targetY + 8} stroke={def.color} strokeWidth={1.5} />
-                  </g>
-                ) : gate.gateId === "SWAP" ? (
+                <circle cx={cx} cy={cy} r={5} fill={def.color} />
+                <circle cx={cx} cy={controlBY} r={5} fill={def.color} />
+                <circle cx={cx} cy={targetY} r={12} fill="var(--bg-card)" stroke={def.color} strokeWidth={1.5} />
+                <line x1={cx - 8} y1={targetY} x2={cx + 8} y2={targetY} stroke={def.color} strokeWidth={1.5} />
+                <line x1={cx} y1={targetY - 8} x2={cx} y2={targetY + 8} stroke={def.color} strokeWidth={1.5} />
+              </g>
+            )
+          }
+
+          if (gate.targetQubit !== undefined) {
+            const targetY = PAD_TOP + gate.targetQubit * CELL_H + CELL_H / 2
+            const minY = Math.min(cy, targetY)
+            const maxY = Math.max(cy, targetY)
+
+            return (
+              <g
+                key={gate.id}
+                onClick={() => removeGate(gate.id)}
+                onMouseDown={(event) => handleMiddleClick(event, gate.id)}
+                style={{ cursor: "grab" }}
+                {...svgDraggableProps}
+                onDragStart={(event) => handleGateDragStart(event, gate)}
+                onDragEnd={(event) => handleGateDragEnd(event)}
+              >
+                <line x1={cx} y1={minY} x2={cx} y2={maxY} stroke={def.color} strokeWidth={1.5} />
+                {gate.gateId === "SWAP" ? (
                   <g>
                     <line x1={cx - 6} y1={cy - 6} x2={cx + 6} y2={cy + 6} stroke={def.color} strokeWidth={1.5} />
                     <line x1={cx + 6} y1={cy - 6} x2={cx - 6} y2={cy + 6} stroke={def.color} strokeWidth={1.5} />
-                    <line x1={cx - 6} y1={cy2 - 6} x2={cx + 6} y2={cy2 + 6} stroke={def.color} strokeWidth={1.5} />
-                    <line x1={cx + 6} y1={cy2 - 6} x2={cx - 6} y2={cy2 + 6} stroke={def.color} strokeWidth={1.5} />
+                    <line x1={cx - 6} y1={targetY - 6} x2={cx + 6} y2={targetY + 6} stroke={def.color} strokeWidth={1.5} />
+                    <line x1={cx + 6} y1={targetY - 6} x2={cx - 6} y2={targetY + 6} stroke={def.color} strokeWidth={1.5} />
                   </g>
                 ) : (
                   <g>
-                    <rect x={cx - 16} y={targetY - 13} width={32} height={26} rx={6} fill="var(--bg-card)" stroke={def.color} strokeWidth={1.5} />
-                    <text
-                      x={cx}
-                      y={targetY + 4}
-                      textAnchor="middle"
-                      fontSize={10}
-                      fontWeight={700}
-                      fontFamily="var(--font-mono)"
-                      fill={def.color}
-                    >
-                      {def.label}
-                    </text>
+                    <circle cx={cx} cy={cy} r={5} fill={def.color} />
+                    {gate.gateId === "CNOT" ? (
+                      <g>
+                        <circle cx={cx} cy={targetY} r={12} fill="var(--bg-card)" stroke={def.color} strokeWidth={1.5} />
+                        <line x1={cx - 8} y1={targetY} x2={cx + 8} y2={targetY} stroke={def.color} strokeWidth={1.5} />
+                        <line x1={cx} y1={targetY - 8} x2={cx} y2={targetY + 8} stroke={def.color} strokeWidth={1.5} />
+                      </g>
+                    ) : (
+                      <g>
+                        <rect x={cx - 16} y={targetY - 13} width={32} height={26} rx={6} fill="var(--bg-card)" stroke={def.color} strokeWidth={1.5} />
+                        <text
+                          x={cx}
+                          y={targetY + 4}
+                          textAnchor="middle"
+                          fontSize={10}
+                          fontWeight={700}
+                          fontFamily="var(--font-mono)"
+                          fill={def.color}
+                        >
+                          {def.label}
+                        </text>
+                      </g>
+                    )}
                   </g>
                 )}
               </g>
@@ -425,8 +535,7 @@ export function CircuitGrid() {
 
         {hoveredCell && selectedGate && !pendingConnection && (() => {
           const { qubit, step } = hoveredCell
-          const key = `${qubit}-${step}`
-          if (gateMap.has(key)) return null
+          if (isCellOccupied(qubit, step)) return null
           const def = GATES[selectedGate]
           if (!def) return null
           const cx = PAD_LEFT + QUBIT_LABEL_W + step * CELL_W + CELL_W / 2

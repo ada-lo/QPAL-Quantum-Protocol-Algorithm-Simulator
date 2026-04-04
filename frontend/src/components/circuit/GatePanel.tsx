@@ -83,7 +83,11 @@ function ToolboxRow({ groups, position }: ToolboxRowProps) {
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           {pendingConnection
-            ? `Click target qubit at step ${pendingConnection.step}`
+            ? pendingConnection.gateId === 'TOFFOLI'
+              ? pendingConnection.qubits.length === 1
+                ? `Click second control at step ${pendingConnection.step + 1}`
+                : `Click target qubit at step ${pendingConnection.step + 1}`
+              : `Click target qubit at step ${pendingConnection.step + 1}`
             : `Click wire to place ${selectedGate}`}
           <button onClick={() => setSelectedGate(null)} style={{
             fontSize: 11, color: 'var(--text-muted)',

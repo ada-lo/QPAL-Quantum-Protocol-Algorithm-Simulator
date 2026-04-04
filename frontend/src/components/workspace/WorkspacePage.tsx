@@ -259,6 +259,7 @@ export function WorkspacePage() {
   // Sync guard: set to true while the parser is writing to the circuit store
   // so the Visual→Text effect ignores that echo update.
   const isParserWritingRef = useRef(false)
+  const isCircuitWritingRef = useRef(false)
 
   const selectLearningExperience = useLearningStore((state) => state.select)
   const loadLearningCircuit = useLearningStore((state) => state.loadIntoCircuit)
@@ -333,6 +334,7 @@ export function WorkspacePage() {
     return new Map(entries)
   }, [catalog?.templates])
   const parsed = useMemo(() => parsePseudoProgram(source), [source])
+  const canSyncCircuit = engine === "custom" && parsed.errors.length === 0 && parsed.instructions.length > 0
   const selectedStep = simulation?.steps[Math.min(activeStep, Math.max(simulation.steps.length - 1, 0))] ?? null
   const selectedState = selectedStep?.state ?? simulation?.final_state ?? null
   const inspectorContext = selectedModel
@@ -392,10 +394,30 @@ export function WorkspacePage() {
     return () => window.clearTimeout(timer)
   }, [source])
 
+  // Visual → Text: when the user edits the circuit grid, regenerate pseudocode.
+  // Bails immediately if the parser was the one that just wrote the circuit.
+  useEffect(() => {
+    if (isParserWritingRef.current) return
+    const nextSource = circuitSnapshotToProgram({
+      nQubits: circuitQubitCount,
+      gates: circuitGates,
+      initialStates: circuitInitialStates,
+    })
+    if (engine !== "custom") {
+      setEngine("custom")
+    }
+    isCircuitWritingRef.current = true
+    setSource((prev) => (nextSource !== prev ? nextSource : prev))
+  }, [circuitQubitCount, circuitGates, circuitInitialStates, engine, setEngine])
+
   // Text → Visual: parse instructions and push to circuit store.
   // Sets isParserWritingRef so the reverse effect doesn't echo back.
   useEffect(() => {
-    if (parsed.instructions.length === 0) return
+    if (isCircuitWritingRef.current) {
+      isCircuitWritingRef.current = false
+      return
+    }
+    if (!canSyncCircuit) return
     const snapshot = programToCircuit(parsed.instructions)
     const nextSignature = circuitSignature({
       nQubits: snapshot.nQubits,
@@ -420,20 +442,7 @@ export function WorkspacePage() {
     queueMicrotask(() => {
       isParserWritingRef.current = false
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parsed.instructions])
-
-  // Visual → Text: when the user edits the circuit grid, regenerate pseudocode.
-  // Bails immediately if the parser was the one that just wrote the circuit.
-  useEffect(() => {
-    if (isParserWritingRef.current) return
-    const nextSource = circuitSnapshotToProgram({
-      nQubits: circuitQubitCount,
-      gates: circuitGates,
-      initialStates: circuitInitialStates,
-    })
-    setSource((prev) => (nextSource !== prev ? nextSource : prev))
-  }, [circuitQubitCount, circuitGates, circuitInitialStates])
+  }, [canSyncCircuit, parsed.instructions, circuitQubitCount, circuitGates, circuitInitialStates])
 
   async function executeProgram(code: string) {
     const executionToken = executionTokenRef.current + 1
@@ -869,7 +878,7 @@ export function WorkspacePage() {
           <div style={splitWorkspaceHostStyle}>
             <div style={stackedWorkspaceShellStyle}>
               <div style={stackedTopPaneStyle}>
-                <WorkspaceCircuitBuilder canSync={parsed.instructions.length > 0} />
+                <WorkspaceCircuitBuilder canSync={canSyncCircuit} />
               </div>
               <div style={terminalPaneStyle}>
                 <div style={editorHeaderStyle}>

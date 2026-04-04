@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import type { GateId } from "@/lib/quantum/gates"
-import type { InitialStateId, StepSnapshot } from "@/lib/quantum/simulator"
+import type { InitialStateId } from "@/lib/quantum/simulator"
 
 // ── Circuit gate representation ──
 export interface CircuitGate {
@@ -15,7 +15,7 @@ export interface CircuitGate {
 
 export interface PendingConnection {
   gateId: GateId
-  controlQubit: number
+  qubits: number[]
   step: number
 }
 
@@ -164,7 +164,12 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
     get().pushHistory()
     set(s => ({
       nQubits: n,
-      gates: s.gates.filter(g => g.qubit < n && (g.targetQubit === undefined || g.targetQubit < n)),
+      gates: s.gates.filter(
+        (g) =>
+          g.qubit < n &&
+          (g.targetQubit === undefined || g.targetQubit < n) &&
+          (g.controlQubit === undefined || g.controlQubit < n),
+      ),
       pendingConnection: null,
       initialStates: makeInitialStates(n),
     }))
@@ -186,7 +191,23 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   moveGate: (id, newQubit, newStep) => {
     get().pushHistory()
     set(s => ({
-      gates: s.gates.map(g => g.id === id ? { ...g, qubit: newQubit, step: newStep } : g),
+      gates: s.gates.map((g) => {
+        if (g.id !== id) return g
+
+        const delta = newQubit - g.qubit
+        const nextGate = {
+          ...g,
+          qubit: newQubit,
+          step: newStep,
+          targetQubit: g.targetQubit !== undefined ? g.targetQubit + delta : undefined,
+          controlQubit: g.controlQubit !== undefined ? g.controlQubit + delta : undefined,
+        }
+        const occupied = [nextGate.qubit, nextGate.targetQubit, nextGate.controlQubit].filter(
+          (value): value is number => value !== undefined,
+        )
+
+        return occupied.every((value) => value >= 0 && value < s.nQubits) ? nextGate : g
+      }),
     }))
   },
 
@@ -233,26 +254,31 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
   // ── URL serialization ──
   toJSON: () => {
     const { nQubits, gates, initialStates } = get()
-    const maxStep = gates.length === 0 ? 0 : Math.max(...gates.map(g => g.step))
-    const cols: (string | number)[][] = []
-    for (let s = 0; s <= maxStep; s++) {
-      const col: (string | number)[] = Array(nQubits).fill(1) // 1 = identity
-      const stepGates = gates.filter(g => g.step === s)
-      for (const g of stepGates) {
-        col[g.qubit] = g.angle !== undefined ? `${g.gateId}(${g.angle})` : g.gateId
-        if (g.targetQubit !== undefined) {
-          col[g.targetQubit] = g.gateId === 'CNOT' ? 'X' : g.gateId
-        }
-      }
-      cols.push(col)
-    }
     const init = initialStates.some(s => s !== '|0⟩') ? initialStates : undefined
-    return JSON.stringify({ cols, init })
+    return JSON.stringify({
+      nQubits,
+      gates: gates.map(({ id, ...gate }) => gate),
+      init,
+    })
   },
 
   fromJSON: (json) => {
     try {
-      const { cols, init } = JSON.parse(json)
+      const parsed = JSON.parse(json)
+      if (Array.isArray(parsed?.gates)) {
+        const nQubits = Number(parsed.nQubits) || 1
+        set({
+          nQubits,
+          gates: parsed.gates.map((gate: Omit<CircuitGate, "id">) => ({ ...gate, id: crypto.randomUUID() })),
+          initialStates: parsed.init ?? makeInitialStates(nQubits),
+          currentStep: 0,
+          isPlaying: false,
+          pendingConnection: null,
+        })
+        return
+      }
+
+      const { cols, init } = parsed
       const nQubits = Math.max(...cols.map((c: any[]) => c.length))
       const gates: CircuitGate[] = []
       for (let s = 0; s < cols.length; s++) {
@@ -261,7 +287,6 @@ export const useCircuitStore = create<CircuitState>((set, get) => ({
           const v = col[q]
           if (v === 1 || v === '1') continue
           const gateStr = typeof v === 'string' ? v : String(v)
-          // Parse angle from "Rx(1.57)" format
           const angleMatch = gateStr.match(/^(\w+)\(([\d.]+)\)$/)
           if (angleMatch) {
             gates.push({
