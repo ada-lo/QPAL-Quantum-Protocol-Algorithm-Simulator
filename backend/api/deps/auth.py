@@ -87,7 +87,7 @@ def require_authenticated_user(
         payload = jwt.decode(
             token,
             signing_key.key,
-            algorithms=["RS256"],
+            algorithms=["RS256", "ES256", "EdDSA"],
             issuer=settings.issuer,
             options={"verify_aud": False},
         )

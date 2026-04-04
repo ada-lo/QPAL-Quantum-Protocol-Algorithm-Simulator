@@ -13,14 +13,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error("Authentication required. Sign in to access the workspace.")
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  })
+  const makeRequest = async (authToken: string) => {
+    return fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+        ...(init?.headers ?? {}),
+      },
+    })
+  }
+
+  let response = await makeRequest(token)
+
+  // On 401, attempt to re-fetch a fresh token and retry once
+  if (response.status === 401) {
+    const freshToken = await getAuthToken()
+    if (freshToken && freshToken !== token) {
+      response = await makeRequest(freshToken)
+    }
+  }
 
   if (response.status === 401) {
     throw new Error("Your session expired or could not be verified. Sign in again.")
