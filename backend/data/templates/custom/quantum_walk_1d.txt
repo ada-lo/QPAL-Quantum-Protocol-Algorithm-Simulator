@@ -1,0 +1,29 @@
+NOTE Discrete-time Quantum Walk — 1D line (3 steps)
+NOTE q0 = coin qubit, q1-q3 = 3-bit position register
+
+INIT q0
+INIT q1
+INIT q2
+INIT q3
+
+LABEL Start at position 0 = |000⟩
+NOTE (position register starts at |000⟩)
+
+LABEL Step 1: coin flip then conditional shift
+H q0
+CNOT q0 q3
+
+LABEL Step 2: coin flip then conditional shift
+H q0
+CNOT q0 q2
+CNOT q0 q3
+
+LABEL Step 3: coin flip then conditional shift
+H q0
+CNOT q0 q1
+CNOT q0 q2
+
+LABEL Readout — position distribution
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z
+MEASURE q3 BASIS Z

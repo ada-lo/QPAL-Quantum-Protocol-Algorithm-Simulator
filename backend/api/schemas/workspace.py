@@ -77,6 +77,7 @@ class WorkspaceExecutionState(BaseModel):
     bloch_vectors: list[WorkspaceBlochVector] = Field(default_factory=list)
     measurements: list[MeasurementRecord] = Field(default_factory=list)
     transmissions: list[TransmissionRecord] = Field(default_factory=list)
+    statevector: list[float] = Field(default_factory=list)  # flat [re0, im0, re1, im1, ...]
 
 
 class WorkspaceExecutionStep(BaseModel):

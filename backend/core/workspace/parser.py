@@ -111,9 +111,13 @@ def parse_pseudocode(source: str) -> List[WorkspaceInstruction]:
             continue
 
         if opcode == "WAIT":
+            try:
+                duration = float(rest[0]) if rest else 1
+            except ValueError:
+                raise ValueError(f"Invalid duration for WAIT: {rest[0]}")
             instructions.append(WorkspaceInstruction(
                 line=line_number, raw=raw, opcode=opcode, args=rest,
-                category="annotation", metadata={"duration": float(rest[0]) if rest else 1},
+                category="annotation", metadata={"duration": duration},
             ))
             continue
 
@@ -245,6 +249,7 @@ def parse_pseudocode(source: str) -> List[WorkspaceInstruction]:
                 ))
             continue
 
-        # Unknown opcode — skip silently (same as frontend behavior for unknown)
+        # ── Unknown opcode — strict, no silent skips ──
+        raise ValueError(f"Unrecognized instruction: {opcode} on line {line_number}")
 
     return instructions

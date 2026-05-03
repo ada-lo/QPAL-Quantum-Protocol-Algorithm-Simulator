@@ -1,0 +1,33 @@
+NOTE HHL Algorithm — simplified 2x2 linear system Ax=b
+NOTE Solves A|x⟩ = |b⟩ where A has eigenvalues 1 and 3
+
+INIT q0
+INIT q1
+INIT q2
+
+LABEL Encode |b⟩ in the input register
+H q2
+
+LABEL QPE: estimate eigenvalues of A
+H q0
+H q1
+CNOT q0 q2
+RZ q2 1.5708
+CNOT q0 q2
+CNOT q1 q2
+RZ q2 0.7854
+CNOT q1 q2
+
+LABEL Ancilla rotation (controlled 1/λ rotation)
+NOTE Simplified: encode reciprocal via RY on ancilla
+RY q0 1.0472
+RY q1 0.5236
+
+LABEL Uncompute QPE
+H q0
+H q1
+
+LABEL Readout
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z

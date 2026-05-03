@@ -1,0 +1,38 @@
+NOTE N-Qubit Teleportation (2-qubit payload example)
+
+ACTOR Alice
+ACTOR Bob
+
+LABEL Payload qubits to teleport
+INIT q0 +
+INIT q1 +
+
+LABEL Bell channel 1 for q0
+INIT q2
+INIT q3
+H q2
+CNOT q2 q3
+ASSIGN q2 Alice
+ASSIGN q3 Bob
+
+LABEL Bell channel 2 for q1
+INIT q4
+INIT q5
+H q4
+CNOT q4 q5
+ASSIGN q4 Alice
+ASSIGN q5 Bob
+
+LABEL Teleport q0
+CNOT q0 q2
+H q0
+MEASURE q0 BASIS Z
+MEASURE q2 BASIS Z
+SEND q2 Alice Bob
+
+LABEL Teleport q1
+CNOT q1 q4
+H q1
+MEASURE q1 BASIS Z
+MEASURE q4 BASIS Z
+SEND q4 Alice Bob

@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import math
 import traceback
+from typing import Any
+
+from fastapi.responses import JSONResponse
 
 from api.schemas.workspace import (
     MeasurementRecord,
@@ -30,6 +33,7 @@ try:
     from qiskit.quantum_info import Statevector
     from qiskit.circuit import QuantumCircuit
     from qiskit_aer import AerSimulator
+    from qiskit_aer.noise import NoiseModel, depolarizing_error, thermal_relaxation_error
     _QISKIT_AVAILABLE = True
 except Exception as _import_err:
     _QISKIT_ERROR = str(_import_err)
@@ -61,6 +65,7 @@ def _sv_to_state(sv_data, n_qubits: int) -> WorkspaceExecutionState:
     qubit_ids = [f"q{i}" for i in range(n_qubits)]
     bloch_vectors = []
     qubit_states = []
+    statevector_flat: list[float] = []
     for idx, qid in enumerate(qubit_ids):
         x, y, z, purity = _bloch_from_sv(sv_data, n_qubits, idx)
         bloch_vectors.append(WorkspaceBlochVector(qubit=qid, x=x, y=y, z=z, purity=purity))
@@ -70,10 +75,37 @@ def _sv_to_state(sv_data, n_qubits: int) -> WorkspaceExecutionState:
             id=qid, initialized=True, state_label=label,
             superposition=(label not in {"0", "1"}),
         ))
+    for amp in sv_data:
+        c = complex(amp)
+        statevector_flat.extend((float(c.real), float(c.imag)))
     return WorkspaceExecutionState(
         qubits=qubit_states, actors=[], bloch_vectors=bloch_vectors,
-        measurements=[], transmissions=[],
+        measurements=[], transmissions=[], statevector=statevector_flat,
     )
+
+
+def _basis_key(index: int, n_qubits: int) -> str:
+    width = max(1, n_qubits)
+    return format(index, f"0{width}b")
+
+
+def _sv_to_complex_state(sv_data, n_qubits: int) -> dict[str, list[float]]:
+    """Universal JSON state mapping: basis -> [real, imag]."""
+    state: dict[str, list[float]] = {}
+    for index, amp in enumerate(sv_data):
+        c = complex(amp)
+        state[_basis_key(index, n_qubits)] = [float(c.real), float(c.imag)]
+    return state
+
+
+def _sv_to_probability_state(sv_data, n_qubits: int) -> dict[str, float]:
+    """Probability mapping used for final_state in Universal JSON."""
+    final_state: dict[str, float] = {}
+    for index, amp in enumerate(sv_data):
+        c = complex(amp)
+        probability = float((c.real * c.real) + (c.imag * c.imag))
+        final_state[_basis_key(index, n_qubits)] = probability
+    return final_state
 
 
 def _error_response(engine: str, message: str) -> WorkspaceSimulateResponse:
@@ -86,13 +118,104 @@ def _error_response(engine: str, message: str) -> WorkspaceSimulateResponse:
 
 # ── Main engine ────────────────────────────────────────────────────────────────
 
-def execute_qasm(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
+def _build_simulator(compute: str | None = None, noise_model_arg: str | None = None,
+                     warnings: list[str] | None = None) -> "AerSimulator":
+    """Build an AerSimulator configured with the user's compute and noise preferences."""
+    kwargs: dict[str, Any] = {}
+
+    # ── Hardware routing ──
+    if compute and compute.lower() == "gpu":
+        try:
+            from qiskit_aer import AerSimulator as _AerSimulator_check  # noqa: F811
+            _AerSimulator_check(device="GPU").set_options()  # quick probe
+            kwargs["device"] = "GPU"
+        except Exception:
+            if warnings is not None:
+                warnings.append("GPU requested but not available — falling back to CPU")
+            kwargs["device"] = "CPU"
+    else:
+        kwargs["device"] = "CPU"
+
+    # ── Noise injection ──
+    noise = None
+    if noise_model_arg and noise_model_arg.lower() != "none":
+        noise = _noise_model_from_label(noise_model_arg, warnings)
+        if noise is not None:
+            kwargs["noise_model"] = noise
+
+    # Import is safe here — called only when _QISKIT_AVAILABLE is True
+    from qiskit_aer import AerSimulator as _AerSimulator  # noqa: F811
+    return _AerSimulator(**kwargs)
+
+
+def _noise_model_from_label(label: str, warnings: list[str] | None = None):
+    """Construct a basic depolarizing noise model from a string label."""
+    from qiskit_aer.noise import NoiseModel, depolarizing_error, errors
+
+    label_lower = label.lower()
+
+    if label_lower in ("basic", "depolarizing", "noise"):
+        # Simple 1-qubit and 2-qubit depolarizing noise
+        noise_model = NoiseModel()
+
+        # 1-qubit depolarizing error: 1% probability
+        error_1q = depolarizing_error(0.01, 1)
+        # 2-qubit depolarizing error: 2% probability
+        error_2q = depolarizing_error(0.02, 2)
+
+        # Apply to all standard gates (approximate coverage)
+        for gate in ["u1", "u2", "u3", "rx", "ry", "rz", "h", "x", "y", "z", "s", "sdg", "t", "tdg"]:
+            noise_model.add_quantum_error(error_1q, gate, [0])
+
+        for gate in ["cx", "cz", "swap", "iswap"]:
+            noise_model.add_all_qubit_quantum_error(error_2q, gate)
+
+        if warnings is not None:
+            warnings.append("Basic depolarizing noise model applied (1% 1q, 2% 2q)")
+
+        return noise_model
+
+    # Custom noise spec: JSON string {"error_rate": 0.015, "type": "depolarizing"}
+    import json
+    try:
+        spec = json.loads(label)
+        error_rate = spec.get("error_rate", 0.01)
+        noise_model = NoiseModel()
+        error_1q = depolarizing_error(error_rate, 1)
+        error_2q = depolarizing_error(2 * error_rate, 2)
+
+        for gate in ["u1", "u2", "u3", "rx", "ry", "rz", "h", "x", "y", "z", "s", "sdg", "t", "tdg"]:
+            noise_model.add_quantum_error(error_1q, gate, [0])
+        for gate in ["cx", "cz", "swap", "iswap"]:
+            noise_model.add_all_qubit_quantum_error(error_2q, gate)
+
+        if warnings is not None:
+            warnings.append(f"Custom noise model: {error_rate:.1%} 1q, {2*error_rate:.1%} 2q depolarizing")
+
+        return noise_model
+    except (json.JSONDecodeError, TypeError, KeyError) as e:
+        if warnings is not None:
+            warnings.append(f"Could not parse custom noise_model: '{label}' ({e}), using no noise")
+        return None
+
+
+def execute_qasm(req: WorkspaceSimulateRequest):
     if not _QISKIT_AVAILABLE:
-        return _error_response("openqasm",
-            f"Qiskit is not installed or failed to import: {_QISKIT_ERROR}. "
-            "Run: pip install qiskit qiskit-aer qiskit-qasm3-import")
+        return JSONResponse(
+            status_code=200,
+            content={
+                "summary": "OpenQASM simulation failed.",
+                "steps": [],
+                "final_state": {},
+                "warnings": [
+                    f"Qiskit is not installed or failed to import: {_QISKIT_ERROR}. "
+                    "Run: pip install qiskit qiskit-aer qiskit-qasm3-import"
+                ],
+            },
+        )
 
     steps: list[WorkspaceExecutionStep] = []
+    universal_steps: list[dict[str, Any]] = []
     warnings: list[str] = []
 
     try:
@@ -100,7 +223,15 @@ def execute_qasm(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
         try:
             circuit = qasm3.loads(req.code)
         except Exception as e:
-            return _error_response("openqasm", f"QASM parse error ({type(e).__name__}): {e!r}")
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "summary": "OpenQASM simulation failed during parsing.",
+                    "steps": [],
+                    "final_state": {},
+                    "warnings": [f"QASM parse error ({type(e).__name__}): {e!r}"],
+                },
+            )
 
         n_qubits = circuit.num_qubits
         gate_data = [i for i in circuit.data if i.operation.name not in ("barrier", "measure")]
@@ -119,14 +250,25 @@ def execute_qasm(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
                 index=step_i,
                 instruction=WorkspaceInstruction(
                     line=step_i + 1, raw=label, opcode=gate_name, args=q_labels,
-                    qubits=[f"q{j}" for j in range(n_qubits)], actors=[], category="quantum",
+                    qubits=q_labels, actors=[], category="quantum",
                 ),
                 event=f"Applied {label}.",
-                state=_sv_to_state(list(sv.data), n_qubits),
+                state=_sv_to_state(list(sv.data), n_qubits)
             ))
+            universal_steps.append(
+                {
+                    "description": f"Applied {label}.",
+                    "state": {
+                        "statevector": _sv_to_state(list(sv.data), n_qubits).statevector
+                    },
+                    "instruction": {
+                        "opcode": gate_name
+                    }
+                }
+            )
 
         # 3. Shot-based measurement
-        sim = AerSimulator()
+        sim = _build_simulator(req.compute, req.noise_model, warnings=warnings)
         meas_circuit = circuit.copy()
         if not any(i.operation.name == "measure" for i in circuit.data):
             meas_circuit.measure_all()
@@ -138,6 +280,7 @@ def execute_qasm(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
             gate_only.append(instr.operation, instr.qubits)
         final_sv = Statevector.from_instruction(gate_only)
         final_state = _sv_to_state(list(final_sv.data), n_qubits)
+        universal_final_state = _sv_to_probability_state(list(final_sv.data), n_qubits)
 
         # 5. Measurement records
         measurement_results: list[MeasurementRecord] = []
@@ -150,7 +293,9 @@ def execute_qasm(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
                 ))
             break
 
-        return WorkspaceSimulateResponse(
+        # Keep legacy workspace payload for backward compatibility while returning
+        # universal step-wise complex amplitudes for the 3D visual adapter.
+        workspace_payload = WorkspaceSimulateResponse(
             engine="openqasm",
             summary=WorkspaceSummary(
                 qubits=[f"q{i}" for i in range(n_qubits)], actors=[],
@@ -160,7 +305,20 @@ def execute_qasm(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
             final_state=final_state,
             measurement_results=measurement_results,
             warnings=warnings,
+        ).model_dump()
+
+        return JSONResponse(
+            status_code=200,
+            content=workspace_payload
         )
 
     except Exception as exc:
-        return _error_response("openqasm", f"{exc}\n\n{traceback.format_exc()}")
+        return JSONResponse(
+            status_code=200,
+            content={
+                "summary": "OpenQASM simulation failed.",
+                "steps": [],
+                "final_state": {},
+                "warnings": [f"{exc}\n\n{traceback.format_exc()}"],
+            },
+        )

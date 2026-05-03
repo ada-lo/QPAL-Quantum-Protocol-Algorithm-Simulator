@@ -1,0 +1,36 @@
+// ============================================================
+// Quantum Phase Estimation (QPE) — OpenQASM 3.0
+// Estimates phase φ of eigenvalue e^(2πiφ) for unitary U.
+// U = T gate (phase = 1/8), 3 counting qubits + 1 eigenstate qubit.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+// 1. Register Declaration
+qubit[4] q;   // q[0..2]=counting, q[3]=eigenstate
+bit[3] c;
+
+// 2. Prepare eigenstate |1⟩ of T gate
+x q[3];
+
+// 3. Hadamard on all counting qubits
+h q[0]; h q[1]; h q[2];
+
+// 4. Controlled-U^(2^k) applications
+cp(pi/4) q[0], q[3];    // Controlled-T^1
+cp(pi/2) q[1], q[3];    // Controlled-T^2
+cp(pi)   q[2], q[3];    // Controlled-T^4
+
+// 5. Inverse QFT on counting register
+swap q[0], q[2];
+h q[0];
+cp(-pi/2) q[1], q[0];
+h q[1];
+cp(-pi/4) q[2], q[0];
+cp(-pi/2) q[2], q[1];
+h q[2];
+
+// 6. Measure counting register → binary encodes phase
+c[0] = measure q[0];
+c[1] = measure q[1];
+c[2] = measure q[2];

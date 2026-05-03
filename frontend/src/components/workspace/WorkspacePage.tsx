@@ -268,18 +268,27 @@ export function WorkspacePage() {
   const circuitGates = useCircuitStore((state) => state.gates)
   const circuitInitialStates = useCircuitStore((state) => state.initialStates)
 
-  const preflightOpen         = useSimStore((s) => s.preflightOpen)
-  const setPreflightOpen      = useSimStore((s) => s.setPreflightOpen)
-  const setSystemHardware     = useSimStore((s) => s.setSystemHardware)
-  const walkthroughOpen       = useSimStore((s) => s.walkthroughOpen)
-  const setWalkthroughOpen    = useSimStore((s) => s.setWalkthroughOpen)
-  const walkthroughStep       = useSimStore((s) => s.walkthroughStep)
-  const setWalkthroughStep    = useSimStore((s) => s.setWalkthroughStep)
-  const openForWalkthrough    = useSimStore((s) => s.openForWalkthrough)
+  const preflightOpen = useSimStore((s) => s.preflightOpen)
+  const setPreflightOpen = useSimStore((s) => s.setPreflightOpen)
+  const setSystemHardware = useSimStore((s) => s.setSystemHardware)
+  const walkthroughOpen = useSimStore((s) => s.walkthroughOpen)
+  const setWalkthroughOpen = useSimStore((s) => s.setWalkthroughOpen)
+  const walkthroughStep = useSimStore((s) => s.walkthroughStep)
+  const setWalkthroughStep = useSimStore((s) => s.setWalkthroughStep)
+  const openForWalkthrough = useSimStore((s) => s.openForWalkthrough)
   const setOpenForWalkthrough = useSimStore((s) => s.setOpenForWalkthrough)
-  const loadTemplate          = useSimStore((s) => s.loadTemplate)
-  const engine                = useSimStore((s) => s.engine)
-  const setEngine             = useSimStore((s) => s.setEngine)
+  const loadTemplate = useSimStore((s) => s.loadTemplate)
+  const engine = useSimStore((s) => s.engine)
+  const setEngine = useSimStore((s) => s.setEngine)
+  const activeTemplateCategory = useSimStore((s) => s.activeTemplateCategory)
+  const activeTemplateBaseCode = useSimStore((s) => s.activeTemplateBaseCode)
+
+  // Sync store's template code to editor when it changes (e.g., after engine switch)
+  useEffect(() => {
+    if (activeTemplateBaseCode !== null) {
+      setSource(activeTemplateBaseCode)
+    }
+  }, [activeTemplateBaseCode])
 
   const selectionOptions = useMemo<WorkspaceModelOption[]>(() => {
     const templateOptions = (catalog?.templates ?? []).map((template) => ({
@@ -333,7 +342,13 @@ export function WorkspacePage() {
     const entries = (catalog?.templates ?? []).map((template) => [template.id, template] as const)
     return new Map(entries)
   }, [catalog?.templates])
-  const parsed = useMemo(() => parsePseudoProgram(source), [source])
+  const parsed = useMemo(() => {
+    if (engine === "custom") {
+      return parsePseudoProgram(source)
+    } else {
+      return { errors: [], warnings: [], instructions: [], qubits: [], actors: [] }
+    }
+  }, [source, engine])
   const canSyncCircuit = engine === "custom" && parsed.errors.length === 0 && parsed.instructions.length > 0
   const selectedStep = simulation?.steps[Math.min(activeStep, Math.max(simulation.steps.length - 1, 0))] ?? null
   const selectedState = selectedStep?.state ?? simulation?.final_state ?? null
@@ -380,19 +395,9 @@ export function WorkspacePage() {
     }
   }, [selectionOptions, selectedModelValue])
 
-  useEffect(() => {
-    if (!source.trim()) {
-      setSimulation(null)
-      setRuntimeError(null)
-      return
-    }
+  // Simulation is only triggered by explicit user action (Run button).
+  // No auto-run on source change.
 
-    const timer = window.setTimeout(async () => {
-      await executeProgram(source)
-    }, 350)
-
-    return () => window.clearTimeout(timer)
-  }, [source])
 
   // Visual → Text: when the user edits the circuit grid, regenerate pseudocode.
   // Bails immediately if the parser was the one that just wrote the circuit.
@@ -403,9 +408,6 @@ export function WorkspacePage() {
       gates: circuitGates,
       initialStates: circuitInitialStates,
     })
-    if (engine !== "custom") {
-      setEngine("custom")
-    }
     isCircuitWritingRef.current = true
     setSource((prev) => (nextSource !== prev ? nextSource : prev))
   }, [circuitQubitCount, circuitGates, circuitInitialStates, engine, setEngine])
@@ -455,13 +457,13 @@ export function WorkspacePage() {
     try {
       const response = await simulateWorkspaceProgram(code, engine, {
         noiseModel: nm === 'ideal' ? undefined : nm,
-        preferGpu:  ct === 'gpu',
+        preferGpu: ct === 'gpu',
       })
       if (executionToken !== executionTokenRef.current) return
       setSimulation(response)
       setRuntimeError(null)
       setActiveStep(Math.max(response.steps.length - 1, 0))
-      
+
       // Auto-open walkthrough if requested via the Step button gatekeeper
       if (openForWalkthrough) {
         setWalkthroughStep(0)
@@ -489,9 +491,15 @@ export function WorkspacePage() {
       return
     }
 
+    // Guard: Block execution if frontend parser found syntax errors
+    if (parsed.errors.length > 0) {
+      setRuntimeError("Please fix syntax errors before running.")
+      return
+    }
+
     const { templateParams } = useSimStore.getState()
     const hasEmptyParams = Object.values(templateParams).some((v) => v === "" || v === null || v === undefined)
-    
+
     if (hasEmptyParams || source.includes("{{")) {
       setValidationFailed(true)
       setRuntimeError("Error: Please provide valid inputs for all template parameters.")
@@ -551,15 +559,13 @@ export function WorkspacePage() {
     }
 
     if (option.source === "template" && option.template) {
-      const hydrated = loadTemplate(option.template)
-      setSource(hydrated)
+      loadTemplate(option.template).then(hydrated => setSource(hydrated))
       return
     }
 
     const templateMatch = findRelatedTemplate(option, catalog?.templates ?? [])
     if (templateMatch) {
-      const hydrated = loadTemplate(templateMatch)
-      setSource(hydrated)
+      loadTemplate(templateMatch).then(hydrated => setSource(hydrated))
       return
     }
 
@@ -608,8 +614,7 @@ export function WorkspacePage() {
     // Fallback: catalog may still be loading — load directly from the catalog map
     const template = templateById.get(templateId)
     if (template) {
-      const hydrated = loadTemplate(template)
-      setSource(hydrated)
+      loadTemplate(template).then(hydrated => setSource(hydrated))
       setDrawerOpen(false)
     }
     // If neither is available yet, delay close so the user can see the item is pending
@@ -623,7 +628,7 @@ export function WorkspacePage() {
 
     const { templateParams } = useSimStore.getState()
     const hasEmptyParams = Object.values(templateParams).some((v) => v === "" || v === null || v === undefined)
-    
+
     if (hasEmptyParams || source.includes("{{")) {
       setValidationFailed(true)
       setRuntimeError("Error: Please provide valid inputs for all template parameters.")
@@ -889,8 +894,8 @@ export function WorkspacePage() {
                     aria-label="Execution engine"
                   >
                     <option value="custom">QPAL Parser</option>
-                    <option value="openqasm">OpenQASM 3.0</option>
-                    <option value="qunetsim">QuNetSim</option>
+                    {activeTemplateCategory !== 'protocol' && <option value="openqasm">OpenQASM 3.0</option>}
+                    {activeTemplateCategory !== 'algorithm' && <option value="qunetsim">QuNetSim</option>}
                   </select>
                   <div style={editorHeaderIconsStyle}>
                     <button type="button" aria-label="Editor info" style={editorHeaderIconButtonStyle}>
@@ -909,11 +914,11 @@ export function WorkspacePage() {
                   ))}
                 </div>
                 <div style={{ borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid #2a3248" }}>
-                  <Editor 
-                    height="220px" 
-                    language={engine === "qunetsim" ? "python" : engine === "openqasm" ? "c" : "plaintext"} 
+                  <Editor
+                    height="220px"
+                    language={engine === "qunetsim" ? "python" : engine === "openqasm" ? "c" : "plaintext"}
                     theme={theme === "dark" ? "vs-dark" : "light"}
-                    value={source} 
+                    value={source}
                     onChange={(val) => setSource(val ?? "")}
                     options={{ minimap: { enabled: false }, fontSize: 13, fontFamily: "var(--font-mono)", padding: { top: 12 }, scrollBeyondLastLine: false }}
                   />
@@ -947,7 +952,7 @@ export function WorkspacePage() {
 
         <aside className="workspace-pane workspace-right-pane" style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
           <AlgorithmSettingsPanel onUpdateSource={setSource} validationFailed={validationFailed} />
-          
+
           <SectionCard
             title="Inspector"
             subtitle="Inspect state, Bloch vectors, analysis, and model-specific docs from here."

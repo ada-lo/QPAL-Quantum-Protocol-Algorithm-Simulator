@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.deps.auth import require_authenticated_user
 from api.schemas.workspace import (
@@ -32,7 +32,10 @@ async def workspace_catalog() -> WorkspaceCatalogResponse:
 async def workspace_simulate(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
     if req.engine == "custom":
         # Parse QPAL pseudocode into structured instructions, then execute
-        instructions = parse_pseudocode(req.code)
+        try:
+            instructions = parse_pseudocode(req.code)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         req.instructions = instructions
         return simulate_workspace(req)
     elif req.engine == "openqasm":

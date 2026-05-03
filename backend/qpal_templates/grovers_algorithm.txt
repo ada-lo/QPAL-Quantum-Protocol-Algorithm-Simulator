@@ -1,0 +1,29 @@
+// ============================================================
+// Grover's Search Algorithm — OpenQASM 3.0
+// Searches an unsorted database of 4 items in O(√N) queries.
+// Marks |11⟩ as the target state.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+// 1. Register Declaration
+qubit[2] q;
+bit[2] c;
+
+// 2. Superposition — equal amplitude over all basis states
+h q[0];
+h q[1];
+
+// 3. Oracle — Phase-flips the target state |11⟩ using CZ
+cz q[0], q[1];
+
+// 4. Diffuser (Grover diffusion operator) — amplitude amplification
+h q[0]; h q[1];
+x q[0]; x q[1];
+cz q[0], q[1];
+x q[0]; x q[1];
+h q[0]; h q[1];
+
+// 5. Measure — |11⟩ appears with high probability after 1 iteration
+c[0] = measure q[0];
+c[1] = measure q[1];

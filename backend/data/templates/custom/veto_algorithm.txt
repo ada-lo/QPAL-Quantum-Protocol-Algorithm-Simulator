@@ -1,0 +1,26 @@
+NOTE Quantum Veto Protocol (3-party GHZ-based)
+
+ACTOR Alice
+ACTOR Bob
+ACTOR Charlie
+
+LABEL Prepare GHZ state
+INIT q0
+INIT q1
+INIT q2
+H q0
+CNOT q0 q1
+CNOT q0 q2
+
+ASSIGN q0 Alice
+ASSIGN q1 Bob
+ASSIGN q2 Charlie
+
+LABEL Each party measures — veto = X then measure
+NOTE Alice vetoes by flipping her qubit
+X q0
+MEASURE q0 BASIS X
+MEASURE q1 BASIS X
+MEASURE q2 BASIS X
+
+NOTE Parity of results reveals veto without identity

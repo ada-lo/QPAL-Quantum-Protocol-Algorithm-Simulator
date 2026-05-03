@@ -1,0 +1,20 @@
+NOTE Quantum Hierarchical Clustering — pairwise similarity
+
+INIT q0
+INIT q1
+INIT q2
+
+LABEL Encode data points for two clusters
+RY q0 0.9553
+RY q1 0.6435
+RY q2 0.3217
+
+LABEL Compute overlap via pairwise entanglement
+H q0
+CNOT q0 q1
+CNOT q0 q2
+
+LABEL Measure to collapse cluster assignments
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z

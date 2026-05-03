@@ -1,0 +1,28 @@
+NOTE Simon's Algorithm — hidden period s=11 (2-qubit example)
+
+INIT q0
+INIT q1
+INIT q2
+INIT q3
+
+LABEL Superpose input register
+H q0
+H q1
+
+LABEL Oracle for s=11: copies input XOR s into output register
+CNOT q0 q2
+CNOT q1 q3
+CNOT q0 q3
+CNOT q1 q2
+
+LABEL Measure output (collapses to one coset)
+MEASURE q2 BASIS Z
+MEASURE q3 BASIS Z
+
+LABEL Hadamard input register
+H q0
+H q1
+
+LABEL Readout — classical post-processing finds s
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z

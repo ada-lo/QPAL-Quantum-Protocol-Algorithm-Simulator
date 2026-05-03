@@ -1,0 +1,36 @@
+// ============================================================
+// Bernstein-Vazirani Algorithm — OpenQASM 3.0
+// Recovers hidden bit-string s from f(x) = s·x (mod 2), 1 query.
+// Hidden string s = 101 (3-qubit example)
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+// 1. Register Declaration
+qubit[4] q;   // q[0..2] = input, q[3] = ancilla
+bit[3] c;
+
+// 2. Initialize ancilla to |1⟩
+x q[3];
+
+// 3. Hadamard on all qubits
+h q[0];
+h q[1];
+h q[2];
+h q[3];
+
+// 4. Oracle encodes secret string s = 101
+//    Apply CNOT for each bit position where s_i = 1
+cx q[0], q[3];   // s[0] = 1
+// cx q[1], q[3]; // s[1] = 0 — skipped
+cx q[2], q[3];   // s[2] = 1
+
+// 5. Hadamard on input qubits
+h q[0];
+h q[1];
+h q[2];
+
+// 6. Measure — result directly reveals s = 101
+c[0] = measure q[0];
+c[1] = measure q[1];
+c[2] = measure q[2];

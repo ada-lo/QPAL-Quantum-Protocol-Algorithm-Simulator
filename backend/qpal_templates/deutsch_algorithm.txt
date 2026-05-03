@@ -1,0 +1,28 @@
+// ============================================================
+// Deutsch Algorithm — OpenQASM 3.0
+// Determines if f(x) is constant or balanced with 1 query.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+// 1. Register Declaration
+qubit[2] q;   // q[0] = control (input), q[1] = ancilla (output)
+bit[1] c;
+
+// 2. Initialize ancilla to |1⟩
+x q[1];
+
+// 3. Apply Hadamard to both qubits → superposition
+h q[0];
+h q[1];
+
+// 4. Oracle — Balanced function: f(x) = x (CNOT encodes it)
+//    Swap to cx q[0], q[1]; for balanced
+//    Comment out cx for constant f(x) = 0
+cx q[0], q[1];
+
+// 5. Apply Hadamard to input qubit
+h q[0];
+
+// 6. Measure — |0⟩ = constant, |1⟩ = balanced
+c[0] = measure q[0];

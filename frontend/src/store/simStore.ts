@@ -3,6 +3,7 @@ import type { StepSnapshot } from "@/lib/quantum/simulator"
 import type { WorkspaceSystemCapabilities, WorkspaceTemplate, WorkspaceSimulationResponse } from "@/lib/workspace/types"
 import { languagePresets, PRESET_UNAVAILABLE } from "@/utils/languagePresets"
 import { simulateWorkspaceProgram } from "@/lib/workspace/api"
+import { getAuthToken } from "@/lib/auth/authClient"
 
 export type NoiseModel = 'ideal' | 'ibm_eagle' | 'ibm_osprey'
 export type ComputeTarget = 'cpu' | 'gpu'
@@ -47,6 +48,7 @@ export interface SimState {
   activeTemplate: WorkspaceTemplate | null
   activeTemplateBaseCode: string | null
   templateParams: Record<string, any>
+  activeTemplateCategory: 'algorithm' | 'protocol' | null
 
   setResult: (r: SimResult) => void
   setSnapshots: (s: StepSnapshot[]) => void
@@ -54,7 +56,7 @@ export interface SimState {
   setError: (e: string | null) => void
   setStreamStep: (s: number) => void
   setEngineUsed: (e: string | null) => void
-  setEngine: (e: 'custom' | 'openqasm' | 'qunetsim') => void
+  setEngine: (e: 'custom' | 'openqasm' | 'qunetsim') => Promise<void>
   runSimulation: (code: string) => Promise<void>
   setPreflightOpen: (v: boolean) => void
   setNoiseModel: (m: NoiseModel) => void
@@ -63,8 +65,8 @@ export interface SimState {
   setWalkthroughOpen: (v: boolean) => void
   setWalkthroughStep: (s: number) => void
   setOpenForWalkthrough: (v: boolean) => void
-  
-  loadTemplate: (template: WorkspaceTemplate) => string
+
+  loadTemplate: (template: WorkspaceTemplate) => Promise<string>
   updateParameter: (key: string, value: any) => string | null
 
   reset: () => void
@@ -95,6 +97,7 @@ export const useSimStore = create<SimState>((set, get) => ({
   activeTemplate: null,
   activeTemplateBaseCode: null,
   templateParams: {},
+  activeTemplateCategory: null,
 
   setResult:             (r) => set({ result: r, loading: false, error: null }),
   setSnapshots:          (s) => set({ snapshots: s }),
@@ -102,7 +105,21 @@ export const useSimStore = create<SimState>((set, get) => ({
   setError:              (e) => set({ error: e, loading: false }),
   setStreamStep:         (s) => set({ streamStep: s }),
   setEngineUsed:         (e) => set({ engineUsed: e }),
-  setEngine:             (e) => set({ engine: e }),
+  setEngine: async (e) => {
+    const category = get().activeTemplateCategory
+    let engineToSet = e
+    if (category === 'protocol' && e === 'openqasm') {
+      engineToSet = 'custom'
+    } else if (category === 'algorithm' && e === 'qunetsim') {
+      engineToSet = 'custom'
+    }
+    set({ engine: engineToSet })
+    // Refetch active template code for the newly selected engine
+    const activeTemplate = get().activeTemplate
+    if (activeTemplate) {
+      await get().loadTemplate(activeTemplate)
+    }
+  },
 
   runSimulation: async (code) => {
     const { engine, noiseModel, computeTarget } = get()
@@ -112,8 +129,72 @@ export const useSimStore = create<SimState>((set, get) => ({
         noiseModel: noiseModel === 'ideal' ? undefined : noiseModel,
         preferGpu: computeTarget === 'gpu',
       })
+
       set({ simulationResponse: response, loading: false, error: null })
+
+      // Determine number of qubits from final_state.qubits
+      const finalState = (response as any).final_state
+      const nQubits = finalState.qubits?.length || 0
+      const dim = nQubits > 0 ? (1 << nQubits) : 0
+
+      // Build snapshots from response steps
+      const rawSteps = (response as any).steps
+      const snapshots: StepSnapshot[] = rawSteps.map((step: any, idx: number) => {
+        const flat: number[] = step.state.statevector || []
+        const sv = new Float64Array(flat)
+        const probs = new Float64Array(dim)
+        for (let i = 0; i < dim; i++) {
+          const re = sv[2*i] || 0
+          const im = sv[2*i+1] || 0
+          probs[i] = re*re + im*im
+        }
+        return {
+          step: idx,
+          gateLabel: step.instruction.opcode,
+          sv,
+          probs,
+        }
+      })
+
+      // Build result from last step's statevector
+      const lastSnap = snapshots[snapshots.length - 1]
+      const stateVector: Complex[] = lastSnap ? Array.from({ length: dim }, (_, i) => ({
+        re: lastSnap.sv[2*i] || 0,
+        im: lastSnap.sv[2*i+1] || 0,
+      })) : Array.from({ length: dim }, () => ({ re: 0, im: 0 }))
+
+      // Bloch vectors from final_state.bloch_vectors
+      const blochVecs = finalState.bloch_vectors || []
+      const blochVectors = blochVecs.map((bv: any) => ({
+        qubit: bv.qubit,
+        x: bv.x,
+        y: bv.y,
+        z: bv.z,
+        purity: bv.purity,
+      }))
+
+      // Probabilities from last snapshot
+      const probabilities = lastSnap ? lastSnap.probs : new Float64Array(dim)
+
+      // DEBUG: Add aggressive logging to diagnose blank UI
+      console.log("[SIM_DEBUG] Raw Response:", response)
+      console.log("[SIM_DEBUG] Calculated Snapshots:", snapshots)
+      console.log("[SIM_DEBUG] Final Result Object:", { stateVector, probabilities, blochVectors })
+
+      set({
+        result: {
+          stateVector,
+          probabilities,
+          fidelity: 1.0,
+          nQubits,
+          shots: 0,
+          blochVectors,
+          counts: {},
+        },
+        snapshots,
+      })
     } catch (err) {
+      console.error("[SIM_ERROR] API Request Failed:", err);
       set({ error: err instanceof Error ? err.message : 'Simulation failed.', loading: false })
     }
   },
@@ -125,41 +206,59 @@ export const useSimStore = create<SimState>((set, get) => ({
   setWalkthroughStep:    (s) => set({ walkthroughStep: s }),
   setOpenForWalkthrough: (v) => set({ openForWalkthrough: v }),
 
-  loadTemplate: (template) => {
+  loadTemplate: async (template) => {
     const params: Record<string, any> = {}
     if (template.parameters) {
       template.parameters.forEach(p => { params[p.name] = p.default })
     }
-    // Infer engine from template kind
-    const engine: 'custom' | 'openqasm' | 'qunetsim' = template.kind === 'protocol' ? 'qunetsim' : 'custom'
-    set({ activeTemplate: template, activeTemplateBaseCode: template.code, templateParams: params, engine })
+    const category: 'algorithm' | 'protocol' = template.kind === 'protocol' ? 'protocol' : 'algorithm'
 
-    // Check for a language-specific preset first
+    // 1. Always set template metadata — NEVER touch `engine` here
+    set({
+      activeTemplate: template,
+      activeTemplateBaseCode: template.code,
+      templateParams: params,
+      activeTemplateCategory: category,
+      result: null,
+      snapshots: [],
+      streamStep: 0,
+      error: null
+    })
+
+    // 2. Fetch code from backend API using current engine
+    const apiEngine = get().engine
+    const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || 'http://localhost:8000'
+    try {
+      const authToken = await getAuthToken()
+      console.log("Fetching template:", template.id, "for engine:", apiEngine)
+      const res = await fetch(`${API_BASE}/api/templates/${apiEngine}/${template.id}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const fetchedCode = data.code as string
+        set({ activeTemplateBaseCode: fetchedCode })
+        return fetchedCode
+      }
+      if (res.status === 404) {
+        const msg = '// Template not yet available in this language. Please write your code here or switch engines.'
+        set({ activeTemplateBaseCode: msg })
+        return msg
+      }
+    } catch (error) {
+      console.error("API Call Failed (loadTemplate):", error)
+    }
+
+    // 3. Fallback: local hydration (offline / unsupported engine)
     const preset = languagePresets[template.id]
-    if (preset && engine !== 'custom') {
-      const presetCode = preset[engine]
-      return presetCode ?? PRESET_UNAVAILABLE(engine)
+    if (preset && apiEngine !== 'custom') {
+      const presetCode = preset[apiEngine] ?? PRESET_UNAVAILABLE(apiEngine)
+      set({ activeTemplateBaseCode: presetCode })
+      return presetCode
     }
 
-    // If engine is openqasm but template only has custom pseudocode, inject a warning
-    const currentEngine = get().engine
-    if (currentEngine === 'openqasm' && !preset?.openqasm) {
-      const warning = '// WARNING: This template is written in QPAL Custom Code.\n// Please switch the engine dropdown to \'QPAL Parser\' to run it,\n// or translate it to OpenQASM.\n\n'
-      // Fall through to hydrate the template code, but prepend the warning
-      let hydrated = template.code
-      for (const [k, v] of Object.entries(params)) {
-        hydrated = hydrated.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v))
-      }
-      if (params['hidden_string'] !== undefined) {
-        const s = String(params['hidden_string'])
-        const n = s.length
-        const cnots = s.split('').map((bit, idx) => bit === '1' ? `CNOT q${idx} q${n}` : '').filter(Boolean).join('\n')
-        hydrated = hydrated.replace(/\{\{oracle_gates\}\}/g, cnots || 'NOTE zero string')
-      }
-      return warning + hydrated
-    }
-
-    // Fallback: hydrate the raw pseudocode with template params
     let hydrated = template.code
     for (const [k, v] of Object.entries(params)) {
       hydrated = hydrated.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v))
@@ -170,6 +269,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       const cnots = s.split('').map((bit, idx) => bit === '1' ? `CNOT q${idx} q${n}` : '').filter(Boolean).join('\n')
       hydrated = hydrated.replace(/\{\{oracle_gates\}\}/g, cnots || 'NOTE zero string')
     }
+    set({ activeTemplateBaseCode: hydrated })
     return hydrated
   },
 
@@ -185,7 +285,6 @@ export const useSimStore = create<SimState>((set, get) => ({
       hydrated = hydrated.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v))
     }
 
-    // Specially handle Oracle generation for Bernstein-Vazirani
     if (newParams['hidden_string'] !== undefined) {
       const s = String(newParams['hidden_string'])
       const n = s.length

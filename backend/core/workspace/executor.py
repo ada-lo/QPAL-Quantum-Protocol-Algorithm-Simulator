@@ -449,12 +449,15 @@ def _snapshot(
             )
         )
 
+    statevector_flat = [comp for c in mini_sv.sv for comp in (c.real, c.imag)]
+
     return WorkspaceExecutionState(
         qubits=qubit_states,
         actors=actor_states,
         bloch_vectors=_build_bloch_vectors(qubits, qubit_index_map, mini_sv),
         measurements=deepcopy(measurements),
         transmissions=deepcopy(transmissions),
+        statevector=statevector_flat,
     )
 
 

@@ -75,6 +75,7 @@ export interface WorkspaceExecutionState {
   bloch_vectors: WorkspaceBlochVector[]
   measurements: WorkspaceMeasurementRecord[]
   transmissions: WorkspaceTransmissionRecord[]
+  statevector: number[]  // flat [re0, im0, re1, im1, ...]
 }
 
 export interface WorkspaceExecutionStep {

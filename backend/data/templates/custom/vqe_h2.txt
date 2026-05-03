@@ -1,0 +1,25 @@
+NOTE VQE ansatz for H₂ (hardware-efficient)
+NOTE Ref: PennyLane VQE tutorial
+
+INIT q0
+INIT q1
+
+LABEL Ansatz layer 1 — single-qubit rotations
+RY q0 0.5
+RY q1 -1.2
+
+LABEL Entangling layer
+CNOT q0 q1
+
+LABEL Ansatz layer 2 — single-qubit rotations
+RY q0 0.8
+RY q1 0.3
+
+LABEL Measure ⟨Z₀Z₁⟩ term
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+
+NOTE In a full VQE:
+NOTE   1. A classical optimizer adjusts the RY angles
+NOTE   2. Multiple Pauli terms are measured (ZZ, ZI, IZ, XX)
+NOTE   3. The expectation values are summed to get ⟨H⟩

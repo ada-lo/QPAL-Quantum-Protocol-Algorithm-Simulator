@@ -1,0 +1,17 @@
+NOTE Deutsch Algorithm — constant vs balanced oracle
+
+INIT q0 1
+INIT q1 +
+
+LABEL Apply Hadamard to both qubits
+H q0
+H q1
+
+LABEL Oracle: balanced f(x) = x (CNOT encodes it)
+CNOT q0 q1
+
+LABEL Final Hadamard on query qubit
+H q0
+
+LABEL Readout — |0⟩ constant, |1⟩ balanced
+MEASURE q0 BASIS Z

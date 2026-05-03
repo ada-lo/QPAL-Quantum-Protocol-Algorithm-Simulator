@@ -1,0 +1,25 @@
+NOTE Quantum KNN — Hadamard test for inner product
+
+INIT q0
+INIT q1
+INIT q2
+
+LABEL Prepare ancilla
+H q0
+
+LABEL Encode test point
+RY q1 0.7854
+
+LABEL Encode training point
+RY q2 1.2566
+
+LABEL Controlled-U: apply training point unitary
+CNOT q0 q2
+RY q2 0.3927
+CNOT q0 q2
+
+LABEL Hadamard test
+H q0
+MEASURE q0 BASIS Z
+
+NOTE P(0) ≈ (1 + Re⟨test|train⟩)/2

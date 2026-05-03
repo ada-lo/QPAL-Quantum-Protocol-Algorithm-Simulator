@@ -1,0 +1,40 @@
+NOTE Quantum Phase Estimation
+NOTE Target: T gate (phase θ = π/4)
+NOTE Estimation qubits: q0 (MSB), q1 (LSB)
+NOTE Target qubit: q2
+
+INIT q0
+INIT q1
+INIT q2
+
+LABEL Prepare eigenstate |1⟩ on target
+X q2
+
+LABEL Hadamard estimation qubits
+H q0
+H q1
+
+LABEL Controlled-U¹ (T gate)
+CNOT q1 q2
+RZ q2 -0.7854
+CNOT q1 q2
+RZ q2 0.7854
+
+LABEL Controlled-U² (S gate)
+CNOT q0 q2
+RZ q2 -1.5708
+CNOT q0 q2
+RZ q2 1.5708
+
+LABEL Inverse QFT on estimation qubits
+SWAP q0 q1
+H q0
+CNOT q1 q0
+RZ q0 0.7854
+CNOT q1 q0
+RZ q0 -0.7854
+H q1
+
+LABEL Readout
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z

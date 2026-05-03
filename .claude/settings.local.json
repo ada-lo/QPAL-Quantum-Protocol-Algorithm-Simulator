@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from core.workspace.parser import parse_pseudocode; parse_pseudocode\\('WAIT abc'\\)\")",
+      "Bash(python -c \"from core.workspace.parser import parse_pseudocode; r = parse_pseudocode\\('WAIT 1.5'\\); print\\(r\\)\")",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -c \"from core.workspace.parser import parse_pseudocode; parse_pseudocode\\('FOO q0'\\)\")",
+      "Bash(python -c \"from fastapi import HTTPException; from core.workspace.parser import parse_pseudocode; from api.routes.workspace import workspace_simulate; from api.schemas.workspace import WorkspaceSimulateRequest; try: parse_pseudocode\\('FOO q0'\\); except ValueError as e: print\\('ValueError raised:', e\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm type-check:*)",
+      "Bash(python -m py_compile core/engines/qasm_engine.py)",
+      "Bash(python -m pytest tests/test_workspace.py -v)",
+      "Bash(.venv/Scripts/python.exe -m pip install -q httpx)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/test_workspace.py -v)",
+      "Bash(.venv/Scripts/python.exe -m pytest backend/tests/test_workspace.py -v)",
+      "Bash(../.venv/Scripts/python.exe -m pytest tests/test_workspace.py -v)",
+      "Bash(../.venv/Scripts/python.exe -m pip install -q -r requirements.txt)",
+      "Bash(../.venv/Scripts/python.exe -m pip install -q httpx)",
+      "Bash(../.venv/Scripts/python.exe -m pytest tests/test_workspace.py::test_strict_parser_guard tests/test_workspace.py::test_openqasm_execution_and_schema tests/test_workspace.py::test_qunetsim_engine_routing -v)",
+      "Bash(pnpm lint:*)"
+    ]
+  }
+}

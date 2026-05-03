@@ -1,0 +1,27 @@
+NOTE Deutsch-Jozsa — 3-bit balanced oracle (XOR parity)
+
+INIT q0
+INIT q1
+INIT q2
+INIT q3 1
+
+LABEL Superpose input qubits, prepare ancilla in |-⟩
+H q0
+H q1
+H q2
+H q3
+
+LABEL Oracle: balanced (XOR of all inputs)
+CNOT q0 q3
+CNOT q1 q3
+CNOT q2 q3
+
+LABEL Final Hadamards on input qubits
+H q0
+H q1
+H q2
+
+LABEL Readout — all |0⟩ means constant
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z

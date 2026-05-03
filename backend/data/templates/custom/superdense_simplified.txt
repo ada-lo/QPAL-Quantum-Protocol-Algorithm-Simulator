@@ -1,0 +1,13 @@
+ACTOR Alice
+ACTOR Bob
+INIT q0
+INIT q1
+ASSIGN q0 Alice
+ASSIGN q1 Bob
+BELL q0 q1
+LABEL Encode message 11
+Z q0
+X q0
+SEND q0 Alice Bob
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z

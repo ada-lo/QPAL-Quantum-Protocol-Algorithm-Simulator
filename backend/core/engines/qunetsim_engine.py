@@ -241,7 +241,7 @@ def execute_qunetsim(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse
             "Network": make_Network(),
         }
 
-    # Restricted builtins — no file I/O, no __import__, no eval/exec
+    # Restricted builtins — no file I/O, no eval/exec, but allow __import__ for module access
     _SAFE_BUILTINS = {
         "abs": abs, "all": all, "any": any, "bin": bin, "bool": bool,
         "chr": chr, "complex": complex, "dict": dict, "divmod": divmod,
@@ -254,6 +254,7 @@ def execute_qunetsim(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse
         "set": set, "slice": slice, "sorted": sorted, "str": str, "sum": sum,
         "tuple": tuple, "type": type, "zip": zip,
         "True": True, "False": False, "None": None,
+        "__import__": __import__,
     }
 
     exec_ns.update({

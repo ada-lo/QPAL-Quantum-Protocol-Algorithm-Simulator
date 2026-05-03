@@ -1,0 +1,42 @@
+NOTE Quantum Private Comparison (Socialist Millionaire)
+NOTE Two parties check if s_Alice == s_Bob
+
+ACTOR Alice
+ACTOR Bob
+ACTOR TP
+
+LABEL TP prepares Bell pairs
+INIT q0
+INIT q1
+INIT q2
+INIT q3
+H q0
+CNOT q0 q1
+H q2
+CNOT q2 q3
+
+ASSIGN q0 Alice
+ASSIGN q1 Bob
+ASSIGN q2 Alice
+ASSIGN q3 Bob
+
+LABEL Alice encodes her secret bit (0=I, 1=X)
+NOTE If Alice's secret=1:
+X q0
+
+LABEL Bob encodes his secret bit
+NOTE If Bob's secret=1:
+X q1
+
+LABEL Both measure in Bell basis
+CNOT q0 q2
+H q0
+MEASURE q0 BASIS Z
+MEASURE q2 BASIS Z
+
+CNOT q1 q3
+H q1
+MEASURE q1 BASIS Z
+MEASURE q3 BASIS Z
+
+NOTE Matching results → secrets are equal

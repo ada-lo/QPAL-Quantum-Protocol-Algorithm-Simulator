@@ -1,0 +1,45 @@
+NOTE Shor's 9-Qubit Code — corrects any single-qubit error
+NOTE Logical |0⟩_L = (|000⟩+|111⟩)^⊗3 / 2√2
+
+INIT q0
+INIT q1
+INIT q2
+INIT q3
+INIT q4
+INIT q5
+INIT q6
+INIT q7
+INIT q8
+
+LABEL Phase-flip code layer (outer code)
+H q0
+H q3
+H q6
+
+LABEL Bit-flip replication (inner repetition code)
+CNOT q0 q1
+CNOT q0 q2
+CNOT q3 q4
+CNOT q3 q5
+CNOT q6 q7
+CNOT q6 q8
+
+LABEL Simulate single phase-flip error on q0
+Z q0
+
+LABEL Bit-flip syndrome: check groups
+INIT q9
+CNOT q0 q9
+CNOT q1 q9
+MEASURE q9 BASIS Z
+
+LABEL Phase syndrome: Hadamard then check groups
+H q0
+H q3
+H q6
+INIT q10
+CNOT q0 q10
+CNOT q3 q10
+MEASURE q10 BASIS Z
+
+NOTE Full correction would apply X or Z based on syndromes

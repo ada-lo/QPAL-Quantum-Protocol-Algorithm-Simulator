@@ -1,0 +1,27 @@
+NOTE Grover's search on 2 qubits — marks |11⟩
+NOTE Ref: PennyLane GroverOperator
+
+INIT q0
+INIT q1
+
+LABEL Uniform superposition
+H q0
+H q1
+
+LABEL Oracle — phase-flip |11⟩
+CZ q0 q1
+
+LABEL Diffusion operator (2|s⟩⟨s| − I)
+H q0
+H q1
+X q0
+X q1
+CZ q0 q1
+X q0
+X q1
+H q0
+H q1
+
+LABEL Readout
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z

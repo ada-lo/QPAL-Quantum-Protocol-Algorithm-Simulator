@@ -1,0 +1,35 @@
+NOTE 3-qubit Quantum Fourier Transform
+NOTE Ref: PennyLane QFT
+
+INIT q0 1
+INIT q1
+INIT q2
+
+LABEL QFT — qubit 0
+H q0
+CNOT q1 q0
+RZ q0 -1.5708
+CNOT q1 q0
+RZ q0 1.5708
+CNOT q2 q0
+RZ q0 -0.7854
+CNOT q2 q0
+RZ q0 0.7854
+
+LABEL QFT — qubit 1
+H q1
+CNOT q2 q1
+RZ q1 -1.5708
+CNOT q2 q1
+RZ q1 1.5708
+
+LABEL QFT — qubit 2
+H q2
+
+LABEL Bit-reversal SWAP
+SWAP q0 q2
+
+LABEL Readout
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z

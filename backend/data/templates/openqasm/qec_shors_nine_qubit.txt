@@ -1,0 +1,38 @@
+// ============================================================
+// QEC: Shor's Nine-Qubit Code — OpenQASM 3.0
+// Corrects ANY single-qubit error (X, Z, or Y) across 9 qubits.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+qubit[9] q;
+bit[1] result;
+
+// 1. Phase-flip protection — encode q[0] into 3 groups
+cx q[0], q[3];
+cx q[0], q[6];
+
+// 2. Enter +/- basis (protects against Z errors)
+h q[0]; h q[3]; h q[6];
+
+// 3. Bit-flip repetition within each group
+cx q[0], q[1]; cx q[0], q[2];    // Group 1
+cx q[3], q[4]; cx q[3], q[5];    // Group 2
+cx q[6], q[7]; cx q[6], q[8];    // Group 3
+
+// 4. Simulate error — Z error on q[0]
+z q[0];
+
+// 5. Bit-flip correction (majority vote per group)
+cx q[0], q[1]; cx q[0], q[2]; ccx q[1], q[2], q[0];
+cx q[3], q[4]; cx q[3], q[5]; ccx q[4], q[5], q[3];
+cx q[6], q[7]; cx q[6], q[8]; ccx q[7], q[8], q[6];
+
+// 6. Exit +/- basis
+h q[0]; h q[3]; h q[6];
+
+// 7. Phase-flip correction — majority vote across groups
+cx q[0], q[3]; cx q[0], q[6]; ccx q[3], q[6], q[0];
+
+// 8. Measure logical qubit
+result[0] = measure q[0];

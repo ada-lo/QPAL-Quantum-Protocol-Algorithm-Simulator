@@ -1,0 +1,35 @@
+NOTE QAOA MaxCut — 3-node triangle graph
+NOTE Ref: PennyLane QAOA
+
+INIT q0
+INIT q1
+INIT q2
+
+LABEL Initial superposition
+H q0
+H q1
+H q2
+
+LABEL Cost layer — ZZ coupling (γ = 0.8)
+NOTE Edge (q0, q1)
+CNOT q0 q1
+RZ q1 1.6
+CNOT q0 q1
+NOTE Edge (q1, q2)
+CNOT q1 q2
+RZ q2 1.6
+CNOT q1 q2
+NOTE Edge (q0, q2)
+CNOT q0 q2
+RZ q2 1.6
+CNOT q0 q2
+
+LABEL Mixer layer — RX (β = 0.5)
+RX q0 1.0
+RX q1 1.0
+RX q2 1.0
+
+LABEL Readout
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z

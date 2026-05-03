@@ -1,5 +1,35 @@
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from api.deps.auth import AuthenticatedUser, require_authenticated_user
 from api.schemas.workspace import WorkspaceInstruction, WorkspaceSimulateRequest
+from api.routes.workspace import router as workspace_router
 from core.workspace.executor import simulate_workspace
+
+
+# ── Test app factory ─────────────────────────────────────────────────────────────
+
+def make_test_app() -> FastAPI:
+    """Build a minimal FastAPI app with just the workspace router for integration tests."""
+    from fastapi import FastAPI
+    app = FastAPI()
+    app.include_router(workspace_router, prefix="/api")
+    return app
+
+
+@pytest.fixture
+def client():
+    """TestClient with auth dependency overridden to bypass Neon Auth."""
+    app = make_test_app()
+
+    def _fake_auth() -> AuthenticatedUser:
+        return AuthenticatedUser(user_id="test_user", claims={})
+
+    app.dependency_overrides[require_authenticated_user] = _fake_auth
+
+    with TestClient(app) as c:
+        yield c
 
 
 def test_workspace_bell_style_flow():
@@ -258,4 +288,69 @@ def test_analysis_different_presets_differ():
     assert result_bell.landscape is not None
     assert result_qft.landscape is not None
     assert result_bell.landscape.energies != result_qft.landscape.energies
+
+
+# ── Tri-engine route level integration tests ─────────────────────────────────────────
+
+def test_strict_parser_guard(client):
+    """Send invalid pseudocode and expect 400 with message about unrecognized instruction.
+
+    Route: POST /api/workspace/simulate (engine=custom)
+    """
+    payload = {
+        "code": "GIBBERISH q0",
+        "engine": "custom"
+    }
+    response = client.post("/api/workspace/simulate", json=payload)
+    assert response.status_code == 400
+    data = response.json()
+    assert "detail" in data
+    assert "Unrecognized instruction" in data["detail"]
+
+
+def test_openqasm_execution_and_schema(client):
+    """Send a simple 1-qubit OpenQASM circuit and assert:
+
+    - 200 OK
+    - Response matches Universal JSON schema (has steps list, final_state dict)
+    - Steps array contains at least the H gate
+    """
+    payload = {
+        "code": 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[1] q;\nh q[0];',
+        "engine": "openqasm"
+    }
+    response = client.post("/api/workspace/simulate", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+
+    # Universal schema checks
+    assert "summary" in data and isinstance(data["summary"], dict)
+    assert "steps" in data and isinstance(data["steps"], list)
+    assert "final_state" in data and isinstance(data["final_state"], dict)
+    assert "measurement_results" in data and isinstance(data["measurement_results"], list)
+    assert "warnings" in data and isinstance(data["warnings"], list)
+
+    # At least one step, instruction opcode includes H
+    assert len(data["steps"]) >= 1
+    step_ops = [step["instruction"]["opcode"] for step in data["steps"] if "instruction" in step]
+    assert "H" in step_ops
+
+
+def test_qunetsim_engine_routing(client):
+    """Ensure qunetsim engine routing does not raise a 500 error.
+
+    The qunetsim engine is optional; if QuNetSim is not installed it should
+    still return a valid WorkspaceSimulateResponse with warnings, not crash.
+    """
+    payload = {
+        "code": "print('no QuNetSim')",
+        "engine": "qunetsim"
+    }
+    response = client.post("/api/workspace/simulate", json=payload)
+    # Expect 200 OK even if QuNetSim is missing
+    assert response.status_code == 200
+    data = response.json()
+    # Must have the universal fields present
+    assert "summary" in data and isinstance(data["summary"], dict)
+    assert "final_state" in data and isinstance(data["final_state"], dict)
 

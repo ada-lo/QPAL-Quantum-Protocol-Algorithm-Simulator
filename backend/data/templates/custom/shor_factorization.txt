@@ -1,0 +1,40 @@
+NOTE Shor's Algorithm — factoring N=15 with a=7
+NOTE Period r=4 → factors 3 and 5
+
+INIT q0
+INIT q1
+INIT q2
+INIT q3
+INIT q4
+
+LABEL Superpose counting register
+H q0
+H q1
+H q2
+H q3
+
+LABEL Prepare target register |1⟩
+X q4
+
+LABEL Modular exponentiation oracle (simplified)
+NOTE 7^1 mod 15 = 7 — encoded as controlled-X
+CNOT q3 q4
+NOTE 7^2 mod 15 = 4 — encoded as controlled-phase
+CZ q2 q4
+NOTE 7^4 mod 15 = 1 — identity
+
+LABEL Inverse QFT on counting register
+SWAP q0 q3
+H q0
+CNOT q1 q0
+RZ q0 0.7854
+CNOT q1 q0
+H q1
+H q2
+H q3
+
+LABEL Readout — period encoded in binary
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z
+MEASURE q3 BASIS Z

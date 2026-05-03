@@ -1,0 +1,25 @@
+NOTE Quantum PCA — extract principal component via QPE
+
+INIT q0
+INIT q1
+INIT q2
+
+LABEL Prepare density matrix eigenstate (|+⟩)
+H q1
+
+LABEL QPE estimation qubits
+H q0
+H q2
+
+LABEL Controlled unitary (density matrix evolution)
+CNOT q0 q1
+RZ q1 1.5708
+CNOT q0 q1
+
+LABEL Uncompute — extract phase into ancilla
+H q0
+H q2
+
+LABEL Readout — phase encodes principal eigenvalue
+MEASURE q0 BASIS Z
+MEASURE q2 BASIS Z

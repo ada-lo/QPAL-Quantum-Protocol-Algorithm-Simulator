@@ -1,0 +1,15 @@
+NOTE Quantum Perceptron — trainable single-qubit neuron
+
+INIT q0
+
+LABEL Encode input feature x
+RY q0 1.0472
+
+LABEL Apply trained weight w
+RZ q0 0.5236
+
+LABEL Activation: Hadamard + threshold measurement
+H q0
+MEASURE q0 BASIS Z
+
+NOTE |0⟩ → NOT activated, |1⟩ → activated

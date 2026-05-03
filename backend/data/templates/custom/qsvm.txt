@@ -1,0 +1,21 @@
+NOTE Quantum SVM — kernel circuit for 2 features
+
+INIT q0
+INIT q1
+
+LABEL Encode data point x1 = (π/4, π/3)
+RY q0 0.7854
+RY q1 1.0472
+
+LABEL Entangle features (ZZ feature map)
+CNOT q0 q1
+RZ q1 1.5708
+CNOT q0 q1
+
+LABEL Encode data point x2 for kernel comparison
+RY q0 0.5236
+RY q1 0.7854
+
+LABEL Measure kernel value
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z

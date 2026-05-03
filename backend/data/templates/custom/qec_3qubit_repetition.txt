@@ -1,0 +1,37 @@
+NOTE QEC: 3-Qubit Bit-Flip Repetition Code
+
+INIT q0 +
+INIT q1
+INIT q2
+
+LABEL Encode logical qubit into 3 physical qubits
+CNOT q0 q1
+CNOT q0 q2
+
+LABEL Simulate bit-flip error on q1
+NOTE (Comment out to test no-error case)
+X q1
+
+LABEL Syndrome measurement ancillas
+INIT q3
+INIT q4
+
+LABEL Parity check: q0 XOR q1
+CNOT q0 q3
+CNOT q1 q3
+
+LABEL Parity check: q1 XOR q2
+CNOT q1 q4
+CNOT q2 q4
+
+LABEL Measure syndromes
+MEASURE q3 BASIS Z
+MEASURE q4 BASIS Z
+
+NOTE Syndrome 10 → flip q0, 11 → flip q1, 01 → flip q2
+NOTE Apply correction then decode
+CNOT q0 q1
+CNOT q0 q2
+
+LABEL Readout logical qubit
+MEASURE q0 BASIS Z

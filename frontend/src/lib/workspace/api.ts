@@ -5,7 +5,7 @@ import type {
 } from "./types"
 import { getAuthToken } from "@/lib/auth/authClient"
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ""
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = await getAuthToken()
@@ -74,6 +74,7 @@ export function simulateWorkspaceProgram(
   engine: string,
   opts?: { noiseModel?: string; preferGpu?: boolean },
 ) {
+  console.log("[SIM_INIT] Sending Simulation Payload:", { engine, codeLength: code.length })
   return request<WorkspaceSimulationResponse>("/api/workspace/simulate", {
     method: "POST",
     body: JSON.stringify({

@@ -1,0 +1,17 @@
+ACTOR Alice
+ACTOR Bob
+INIT q0 +
+INIT q1
+INIT q2
+ASSIGN q0 Alice
+ASSIGN q1 Alice
+ASSIGN q2 Bob
+LABEL Share entanglement
+H q1
+CNOT q1 q2
+LABEL Alice encodes the Bell measurement
+CNOT q0 q1
+H q0
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+SEND q1 Alice Bob

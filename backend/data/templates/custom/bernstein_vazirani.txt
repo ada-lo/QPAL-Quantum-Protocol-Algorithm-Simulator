@@ -1,0 +1,23 @@
+NOTE Bernstein-Vazirani — hidden string s={{hidden_string}}
+
+INIT q0
+INIT q1
+INIT q2
+INIT q3 1
+
+H q0
+H q1
+H q2
+H q3
+
+LABEL Oracle encodes s={{hidden_string}}
+{{oracle_gates}}
+
+H q0
+H q1
+H q2
+
+LABEL Readout reveals hidden string
+MEASURE q0 BASIS Z
+MEASURE q1 BASIS Z
+MEASURE q2 BASIS Z

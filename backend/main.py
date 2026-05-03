@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 from api.routes.workspace import router as workspace_router
+from api.routes.templates import router as templates_router
 
 load_dotenv()
 
@@ -16,7 +17,7 @@ app = FastAPI(
 origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,6 +30,7 @@ async def health():
 
 
 app.include_router(workspace_router, prefix="/api")
+app.include_router(templates_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn

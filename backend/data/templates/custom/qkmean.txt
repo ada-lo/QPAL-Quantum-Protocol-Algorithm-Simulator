@@ -1,0 +1,25 @@
+NOTE Quantum K-Means — swap test for cluster assignment
+
+INIT q0
+INIT q1
+INIT q2
+
+LABEL Ancilla for swap test
+H q0
+
+LABEL Encode data point
+RY q1 1.0472
+
+LABEL Encode centroid
+RY q2 0.5236
+
+LABEL Controlled-SWAP (Fredkin) for overlap
+CNOT q1 q2
+CNOT q0 q1
+CNOT q1 q2
+
+LABEL Final Hadamard on ancilla
+H q0
+
+LABEL Measure ancilla — |0⟩ probability ~ cos²(θ/2)
+MEASURE q0 BASIS Z

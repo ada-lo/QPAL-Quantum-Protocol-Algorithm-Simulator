@@ -1,0 +1,35 @@
+// ============================================================
+// Quantum Fourier Transform (QFT) — OpenQASM 3.0
+// Transforms computational basis to frequency basis (3 qubits).
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+// 1. Register Declaration
+qubit[3] q;
+bit[3] c;
+
+// 2. Initialize example state |101⟩
+x q[0];
+x q[2];
+
+// 3. QFT Circuit
+// -- QFT on q[0]
+h q[0];
+cp(pi/2) q[1], q[0];    // Controlled-R2
+cp(pi/4) q[2], q[0];    // Controlled-R3
+
+// -- QFT on q[1]
+h q[1];
+cp(pi/2) q[2], q[1];    // Controlled-R2
+
+// -- QFT on q[2]
+h q[2];
+
+// 4. Swap to correct bit-reversal output order
+swap q[0], q[2];
+
+// 5. Measure transformed state
+c[0] = measure q[0];
+c[1] = measure q[1];
+c[2] = measure q[2];

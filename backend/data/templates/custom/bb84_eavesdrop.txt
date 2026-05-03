@@ -1,0 +1,10 @@
+ACTOR Alice
+ACTOR Bob
+ACTOR Eve
+LABEL Prepare photon
+INIT q0 +
+ASSIGN q0 Alice
+SEND q0 Alice Bob
+INTERCEPT q0 Eve
+SEND q0 Eve Bob
+MEASURE q0 BASIS Z

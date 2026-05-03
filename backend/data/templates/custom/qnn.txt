@@ -1,0 +1,24 @@
+NOTE Quantum Neural Network — 2-qubit variational circuit
+
+INIT q0
+INIT q1
+
+LABEL Input encoding layer
+RY q0 0.7854
+RY q1 1.0472
+
+LABEL Hidden variational layer 1
+RZ q0 0.3927
+RZ q1 0.7854
+CNOT q0 q1
+
+LABEL Hidden variational layer 2
+RY q0 0.5236
+RY q1 0.2618
+CNOT q1 q0
+
+LABEL Output layer
+RZ q0 0.9817
+
+LABEL Readout
+MEASURE q0 BASIS Z
