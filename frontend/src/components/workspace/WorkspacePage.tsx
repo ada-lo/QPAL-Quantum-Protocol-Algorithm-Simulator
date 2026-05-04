@@ -187,6 +187,13 @@ function resolveStudioId(rawId: string, tags: string[] = []) {
   return STUDIO_ALIASES[rawId] ?? STUDIO_ALIASES[normalizedId] ?? null
 }
 
+function fallbackStudioIdForOption(option: WorkspaceModelOption) {
+  if (option.studioId) return option.studioId
+  const lowerKind = option.kindLabel.toLowerCase()
+  const requestedKind: LearningExperience["kind"] = lowerKind.includes("protocol") ? "protocol" : "algorithm"
+  return LEARNING_EXPERIENCES.find((experience) => experience.kind === requestedKind)?.id ?? LEARNING_EXPERIENCES[0]?.id ?? null
+}
+
 function findRelatedTemplate(option: WorkspaceModelOption, templates: WorkspaceTemplate[]) {
   const tokens = tokensForOption(option)
   const matches = templates.filter((template) => {
@@ -553,9 +560,8 @@ export function WorkspacePage() {
     setSelectedModelValue(option.value)
     setActiveInspector("studio")
 
-    if (option.studioId) {
-      selectLearningExperience(option.studioId)
-    }
+    const studioId = fallbackStudioIdForOption(option)
+    if (studioId) selectLearningExperience(studioId)
 
     loadPreset(option.preset.gates, option.preset.nQubits)
     setSource(
@@ -574,13 +580,9 @@ export function WorkspacePage() {
     }
 
     setSelectedModelValue(option.value)
-
-    if (option.studioId) {
-      selectLearningExperience(option.studioId)
-      setActiveInspector("studio")
-    } else {
-      setActiveInspector("state")
-    }
+    setActiveInspector("studio")
+    const studioId = fallbackStudioIdForOption(option)
+    if (studioId) selectLearningExperience(studioId)
 
     if (option.source === "template" && option.template) {
       loadTemplate(option.template).then(hydrated => setSource(hydrated))
@@ -988,7 +990,7 @@ export function WorkspacePage() {
             style={{ display: "flex", flexDirection: "column" }}
             action={
               <div style={tabRailStyle}>
-                {INSPECTOR_TABS.filter((tab) => tab.id !== "studio" || selectedModel?.studioId).map((tab) => (
+                {INSPECTOR_TABS.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveInspector(tab.id)}
@@ -1005,7 +1007,13 @@ export function WorkspacePage() {
               </div>
             }
           >
-            {activeInspector === "studio" && <LearningStudioPanel />}
+            {activeInspector === "studio" && (
+              <LearningStudioPanel
+                simulation={simulation}
+                activeStep={activeStep}
+                onStepChange={setActiveStep}
+              />
+            )}
             {activeInspector === "state" && <StateInspector state={selectedState} instructions={parsed.instructions} stepLabel={selectedStep?.event ?? "No active step"} />}
             {activeInspector === "bloch" && <BlochInspector state={selectedState} />}
             {activeInspector === "docs" && <DocsPanel syntax={catalog?.syntax ?? []} templates={filteredTemplates} notes={catalog?.architecture_notes ?? []} context={inspectorContext} />}

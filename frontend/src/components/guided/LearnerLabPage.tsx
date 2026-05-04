@@ -310,7 +310,11 @@ export function LearnerLabPage() {
         <aside style={sideColumnStyle}>
           <div style={panelStyle}>
             <div style={eyebrowStyle}>STUDIO</div>
-            <LearningStudioPanel />
+            <LearningStudioPanel
+              simulation={simulation}
+              activeStep={activeStep}
+              onStepChange={setActiveStep}
+            />
           </div>
 
           <div style={panelStyle}>

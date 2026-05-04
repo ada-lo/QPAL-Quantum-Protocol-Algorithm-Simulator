@@ -3,13 +3,22 @@ import { createPortal } from "react-dom"
 import { ChevronLeft, ChevronRight, Expand, Pause, Play, X } from "lucide-react"
 import { getLearningExperience } from "@/lib/quantum/learningCatalog"
 import { getLearningSceneProfile } from "@/lib/quantum/learningSceneProfiles"
+import type { WorkspaceSimulationResponse } from "@/lib/workspace/types"
 import { useLearningStore } from "@/store/learningStore"
+import { ExecutionReactiveStudioPanel } from "./ExecutionReactiveStudio3D"
 import { QuantumShowcase3D } from "./QuantumShowcase3D"
 
-export function LearningStudioPanel() {
+interface LearningStudioPanelProps {
+  simulation?: WorkspaceSimulationResponse | null
+  activeStep?: number
+  onStepChange?: (step: number) => void
+}
+
+export function LearningStudioPanel({ simulation, activeStep, onStepChange }: LearningStudioPanelProps = {}) {
   const selectedId = useLearningStore((s) => s.selectedId)
   const experience = getLearningExperience(selectedId)
   const profile = getLearningSceneProfile(experience.id)
+  const hasExecutionMode = Boolean(simulation && typeof activeStep === "number" && simulation.steps.length > 0)
   const [stageIndex, setStageIndex] = useState(0)
   const [playing, setPlaying] = useState(true)
   const [expanded, setExpanded] = useState(false)
@@ -19,12 +28,12 @@ export function LearningStudioPanel() {
   }, [experience.id])
 
   useEffect(() => {
-    if (!playing) return
+    if (hasExecutionMode || !playing) return
     const timer = window.setInterval(() => {
       setStageIndex((current) => (current + 1) % profile.stages.length)
     }, 2600)
     return () => window.clearInterval(timer)
-  }, [playing, profile.stages.length])
+  }, [hasExecutionMode, playing, profile.stages.length])
 
   useEffect(() => {
     if (!expanded) return
@@ -60,6 +69,59 @@ export function LearningStudioPanel() {
   )
 
   const activeStage = profile.stages[stageIndex] ?? profile.stages[0]
+
+  if (hasExecutionMode && simulation && typeof activeStep === "number") {
+    return (
+      <>
+        <ExecutionReactiveStudioPanel
+          compact
+          simulation={simulation}
+          activeStep={activeStep}
+          onStepChange={onStepChange}
+          onExpand={() => setExpanded(true)}
+        />
+        {expanded &&
+          createPortal(
+            <div
+              onClick={() => setExpanded(false)}
+              style={{
+                position: "fixed",
+                inset: 18,
+                zIndex: 300,
+                background: "var(--studio-overlay)",
+                backdropFilter: "blur(8px)",
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  width: "min(1180px, calc(100vw - 48px))",
+                  height: "min(860px, calc(100vh - 48px))",
+                  minWidth: 760,
+                  minHeight: 560,
+                  resize: "both",
+                  overflow: "hidden",
+                  borderRadius: "var(--radius-xl)",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-panel)",
+                  boxShadow: "var(--shadow-soft)",
+                }}
+              >
+                <ExecutionReactiveStudioPanel
+                  simulation={simulation}
+                  activeStep={activeStep}
+                  onStepChange={onStepChange}
+                  onClose={() => setExpanded(false)}
+                />
+              </div>
+            </div>,
+            document.body,
+          )}
+      </>
+    )
+  }
 
   return (
     <>
