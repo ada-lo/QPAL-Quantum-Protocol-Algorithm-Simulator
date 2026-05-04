@@ -1,4 +1,4 @@
-﻿
+
 import { Suspense } from "react"
 import { Canvas } from "@react-three/fiber"
 import { OrbitControls, Text } from "@react-three/drei"
@@ -9,6 +9,20 @@ import { useSimStore } from "@/store/simStore"
 export function BlochSphere() {
   const nQubits = useCircuitStore(s => s.nQubits)
   const result = useSimStore(s => s.result)
+
+  // Prevent Canvas mount until valid data exists (avoids WebGL Context Lost)
+  if (!result || !result.blochVectors || result.blochVectors.length === 0) {
+    return (
+      <div style={{
+        display: "grid", placeItems: "center", height: "100%",
+        background: "var(--bg-panel)", color: "var(--text-muted)",
+        fontFamily: "var(--font-mono)", fontSize: 12,
+      }}>
+        Waiting for quantum state data…
+      </div>
+    )
+  }
+
   const count = Math.min(nQubits, 4)
   const cols = count > 2 ? 2 : count
 

@@ -82,7 +82,7 @@ export interface WorkspaceExecutionStep {
   index: number
   instruction: WorkspaceInstruction
   event: string
-  state: WorkspaceExecutionState
+  state?: WorkspaceExecutionState | null
 }
 
 export interface WorkspaceSummary {
@@ -92,14 +92,33 @@ export interface WorkspaceSummary {
   measurements: number
 }
 
-export interface WorkspaceSimulationResponse {
+/** Response for pure-math algorithm simulations (gate circuits, no networking). */
+export interface WorkspaceAlgorithmResponse {
+  kind: 'algorithm'
   engine: string
   summary: WorkspaceSummary
   steps: WorkspaceExecutionStep[]
-  final_state: WorkspaceExecutionState
-  measurement_results: WorkspaceMeasurementRecord[]
+  statevector: number[]   // flat [re0, im0, re1, im1, ...]
+  bloch_vectors: WorkspaceBlochVector[]
   warnings: string[]
 }
+
+/** Response for networking protocol simulations (actors, transmissions, measurements). */
+export interface WorkspaceProtocolResponse {
+  kind: 'protocol'
+  engine: string
+  summary: WorkspaceSummary
+  steps: WorkspaceExecutionStep[]
+  actors: WorkspaceActorState[]
+  transmissions: WorkspaceTransmissionRecord[]
+  measurements: WorkspaceMeasurementRecord[]
+  statevector: number[]   // flat [re0, im0, re1, im1, ...]
+  bloch_vectors: WorkspaceBlochVector[]
+  warnings: string[]
+}
+
+/** Discriminated union — the `kind` field selects which schema applies. */
+export type WorkspaceSimulationResponse = WorkspaceAlgorithmResponse | WorkspaceProtocolResponse
 
 export interface WorkspaceSyntaxItem {
   syntax: string

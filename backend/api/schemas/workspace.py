@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Discriminator, Field, Tag
 
 
 class WorkspaceInstruction(BaseModel):
@@ -84,7 +84,7 @@ class WorkspaceExecutionStep(BaseModel):
     index: int
     instruction: WorkspaceInstruction
     event: str
-    state: WorkspaceExecutionState
+    state: WorkspaceExecutionState | None = None
 
 
 class WorkspaceSummary(BaseModel):
@@ -94,13 +94,41 @@ class WorkspaceSummary(BaseModel):
     measurements: int = 0
 
 
-class WorkspaceSimulateResponse(BaseModel):
+class WorkspaceAlgorithmResponse(BaseModel):
+    """Response for pure-math algorithm simulations (gate circuits, no networking)."""
+
+    kind: Literal["algorithm"] = "algorithm"
     engine: str = "simplified-workspace-backend"
     summary: WorkspaceSummary
     steps: list[WorkspaceExecutionStep] = Field(default_factory=list)
-    final_state: WorkspaceExecutionState
-    measurement_results: list[MeasurementRecord] = Field(default_factory=list)
+    statevector: list[float] = Field(default_factory=list)  # flat [re0, im0, re1, im1, ...]
+    bloch_vectors: list[WorkspaceBlochVector] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class WorkspaceProtocolResponse(BaseModel):
+    """Response for networking protocol simulations (actors, transmissions, measurements)."""
+
+    kind: Literal["protocol"] = "protocol"
+    engine: str = "simplified-workspace-backend"
+    summary: WorkspaceSummary
+    steps: list[WorkspaceExecutionStep] = Field(default_factory=list)
+    actors: list[WorkspaceActorState] = Field(default_factory=list)
+    transmissions: list[TransmissionRecord] = Field(default_factory=list)
+    measurements: list[MeasurementRecord] = Field(default_factory=list)
+    statevector: list[float] = Field(default_factory=list)  # flat [re0, im0, re1, im1, ...]
+    bloch_vectors: list[WorkspaceBlochVector] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+# Discriminated Union: the `kind` field selects which schema to use.
+WorkspaceSimulateResponse = Annotated[
+    Union[
+        Annotated[WorkspaceAlgorithmResponse, Tag("algorithm")],
+        Annotated[WorkspaceProtocolResponse, Tag("protocol")],
+    ],
+    Discriminator("kind"),
+]
 
 
 class WorkspaceSyntaxItem(BaseModel):

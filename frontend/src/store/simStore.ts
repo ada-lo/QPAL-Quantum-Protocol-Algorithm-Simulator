@@ -99,12 +99,12 @@ export const useSimStore = create<SimState>((set, get) => ({
   templateParams: {},
   activeTemplateCategory: null,
 
-  setResult:             (r) => set({ result: r, loading: false, error: null }),
-  setSnapshots:          (s) => set({ snapshots: s }),
-  setLoading:            (v) => set({ loading: v }),
-  setError:              (e) => set({ error: e, loading: false }),
-  setStreamStep:         (s) => set({ streamStep: s }),
-  setEngineUsed:         (e) => set({ engineUsed: e }),
+  setResult: (r) => set({ result: r, loading: false, error: null }),
+  setSnapshots: (s) => set({ snapshots: s }),
+  setLoading: (v) => set({ loading: v }),
+  setError: (e) => set({ error: e, loading: false }),
+  setStreamStep: (s) => set({ streamStep: s }),
+  setEngineUsed: (e) => set({ engineUsed: e }),
   setEngine: async (e) => {
     const category = get().activeTemplateCategory
     let engineToSet = e
@@ -132,25 +132,27 @@ export const useSimStore = create<SimState>((set, get) => ({
 
       set({ simulationResponse: response, loading: false, error: null })
 
-      // Determine number of qubits from final_state.qubits
-      const finalState = (response as any).final_state
-      const nQubits = finalState.qubits?.length || 0
+      // FIX 1: Point to the new 'summary' block instead of 'final_state'
+      // We use a fallback just in case old cached data passes through
+      const summaryData = (response as any).summary || (response as any).final_state || {}
+      const nQubits = summaryData.qubits?.length || 0
       const dim = nQubits > 0 ? (1 << nQubits) : 0
 
       // Build snapshots from response steps
-      const rawSteps = (response as any).steps
+      const rawSteps = (response as any).steps || []
       const snapshots: StepSnapshot[] = rawSteps.map((step: any, idx: number) => {
-        const flat: number[] = step.state.statevector || []
+        // FIX 2: Add optional chaining (?.) to state so it never crashes even if a step is missing math
+        const flat: number[] = step.state?.statevector || []
         const sv = new Float64Array(flat)
         const probs = new Float64Array(dim)
         for (let i = 0; i < dim; i++) {
-          const re = sv[2*i] || 0
-          const im = sv[2*i+1] || 0
-          probs[i] = re*re + im*im
+          const re = sv[2 * i] || 0
+          const im = sv[2 * i + 1] || 0
+          probs[i] = re * re + im * im
         }
         return {
           step: idx,
-          gateLabel: step.instruction.opcode,
+          gateLabel: step.instruction?.opcode || "UNKNOWN",
           sv,
           probs,
         }
@@ -159,12 +161,12 @@ export const useSimStore = create<SimState>((set, get) => ({
       // Build result from last step's statevector
       const lastSnap = snapshots[snapshots.length - 1]
       const stateVector: Complex[] = lastSnap ? Array.from({ length: dim }, (_, i) => ({
-        re: lastSnap.sv[2*i] || 0,
-        im: lastSnap.sv[2*i+1] || 0,
+        re: lastSnap.sv[2 * i] || 0,
+        im: lastSnap.sv[2 * i + 1] || 0,
       })) : Array.from({ length: dim }, () => ({ re: 0, im: 0 }))
 
-      // Bloch vectors from final_state.bloch_vectors
-      const blochVecs = finalState.bloch_vectors || []
+      // Bloch vectors from root-level response (new schema)
+      const blochVecs = (response as any).bloch_vectors || []
       const blochVectors = blochVecs.map((bv: any) => ({
         qubit: bv.qubit,
         x: bv.x,
@@ -198,12 +200,12 @@ export const useSimStore = create<SimState>((set, get) => ({
       set({ error: err instanceof Error ? err.message : 'Simulation failed.', loading: false })
     }
   },
-  setPreflightOpen:      (v) => set({ preflightOpen: v }),
-  setNoiseModel:         (m) => set({ noiseModel: m }),
-  setComputeTarget:      (t) => set({ computeTarget: t }),
-  setSystemHardware:     (h) => set({ systemHardware: h }),
-  setWalkthroughOpen:    (v) => set({ walkthroughOpen: v }),
-  setWalkthroughStep:    (s) => set({ walkthroughStep: s }),
+  setPreflightOpen: (v) => set({ preflightOpen: v }),
+  setNoiseModel: (m) => set({ noiseModel: m }),
+  setComputeTarget: (t) => set({ computeTarget: t }),
+  setSystemHardware: (h) => set({ systemHardware: h }),
+  setWalkthroughOpen: (v) => set({ walkthroughOpen: v }),
+  setWalkthroughStep: (s) => set({ walkthroughStep: s }),
   setOpenForWalkthrough: (v) => set({ openForWalkthrough: v }),
 
   loadTemplate: async (template) => {

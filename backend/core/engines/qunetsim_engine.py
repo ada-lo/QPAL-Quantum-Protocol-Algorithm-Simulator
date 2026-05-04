@@ -23,9 +23,9 @@ from api.schemas.workspace import (
     WorkspaceInstruction,
     WorkspaceQubitState,
     WorkspaceSimulateRequest,
-    WorkspaceSimulateResponse,
     WorkspaceSummary,
 )
+from core.engines.base_engine import BaseQuantumEngine
 
 
 # ── Log event accumulator ─────────────────────────────────────────────────────
@@ -190,7 +190,23 @@ class _StubNetwork:
 
 # ── Main engine ────────────────────────────────────────────────────────────────
 
-def execute_qunetsim(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
+class QuNetSimEngine(BaseQuantumEngine):
+    """QuNetSim network protocol execution engine."""
+
+    def execute(self, req: WorkspaceSimulateRequest):
+        return _execute_qunetsim_impl(self, req)
+
+
+# Singleton instance for module-level convenience function
+_engine = QuNetSimEngine()
+
+
+def execute_qunetsim(req: WorkspaceSimulateRequest):
+    """Module-level convenience — delegates to QuNetSimEngine."""
+    return _engine.execute(req)
+
+
+def _execute_qunetsim_impl(engine: QuNetSimEngine, req: WorkspaceSimulateRequest):
     """Execute a QuNetSim Python script in a sandboxed namespace."""
     log = _NetworkLog()
     step_ref = [0]  # mutable step counter shared across stubs
@@ -350,11 +366,14 @@ def execute_qunetsim(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse
         measurements=len(log.measurements),
     )
 
-    return WorkspaceSimulateResponse(
+    return engine.format_response(
         engine="qunetsim",
         summary=summary,
         steps=steps,
-        final_state=final_state,
-        measurement_results=log.measurements,
+        actors=list(final_state.actors),
+        transmissions=list(final_state.transmissions),
+        measurements=list(final_state.measurements),
+        statevector=list(final_state.statevector),
+        bloch_vectors=list(final_state.bloch_vectors),
         warnings=warnings,
     )

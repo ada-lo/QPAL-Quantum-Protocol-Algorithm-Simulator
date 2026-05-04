@@ -6,29 +6,45 @@ import type { BlochVec } from "@/store/simStore"
 
 interface Props { bv: BlochVec }
 
+/** Clamp NaN / undefined to 0 to prevent WebGL Context Lost crashes. */
+function safeBv(bv: BlochVec): { x: number; y: number; z: number } {
+  const x = Number.isFinite(bv?.x) ? bv.x : 0
+  const y = Number.isFinite(bv?.y) ? bv.y : 0
+  const z = Number.isFinite(bv?.z) ? bv.z : 0
+  return { x, y, z }
+}
+
+/** .normalize() on a zero-vector returns (NaN,NaN,NaN) — fall back to +Z. */
+function safeNormalize(v: THREE.Vector3): THREE.Vector3 {
+  const len = v.length()
+  return len > 1e-9 ? v.normalize() : new THREE.Vector3(0, 0, 1)
+}
+
 export function BlochScene({ bv }: Props) {
   const arrowRef = useRef<THREE.ArrowHelper | null>(null)
   const ringRef  = useRef<THREE.Mesh | null>(null)
 
-  const purity = Math.sqrt(bv.x**2 + bv.y**2 + bv.z**2)
+  const s = safeBv(bv)
+  const purity = Math.sqrt(s.x**2 + s.y**2 + s.z**2)
   const arrowColor = purity > 0.95 ? 0x00d4ff : purity > 0.5 ? 0xf59e0b : 0xef4444
+  const arrowLen = Math.max(purity * 0.88, 0.001) // never zero — ArrowHelper needs length > 0
 
   useFrame(() => {
     if (arrowRef.current) {
-      const dir = new THREE.Vector3(bv.x, bv.z, -bv.y).normalize()
+      const dir = safeNormalize(new THREE.Vector3(s.x, s.z, -s.y))
       arrowRef.current.setDirection(dir)
-      arrowRef.current.setLength(purity * 0.88, 0.16, 0.07)
+      arrowRef.current.setLength(arrowLen, 0.16, 0.07)
       // @ts-ignore
       arrowRef.current.line.material.color.setHex(arrowColor)
       // @ts-ignore
       arrowRef.current.cone.material.color.setHex(arrowColor)
     }
     if (ringRef.current) {
-      ringRef.current.scale.setScalar(purity)
+      ringRef.current.scale.setScalar(Math.max(purity, 0.001))
     }
   })
 
-  const dir = new THREE.Vector3(bv.x, bv.z, -bv.y).normalize()
+  const dir = safeNormalize(new THREE.Vector3(s.x, s.z, -s.y))
 
   return (
     <>

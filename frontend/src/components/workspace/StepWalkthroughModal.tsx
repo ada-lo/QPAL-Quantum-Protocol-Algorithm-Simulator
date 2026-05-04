@@ -100,7 +100,7 @@ export function StepWalkthroughModal({
 
   const clampedStep = Math.max(0, Math.min(currentStep, steps.length - 1))
   const step = steps[clampedStep]
-  const blochVectors = step.state.bloch_vectors ?? []
+  const blochVectors = step.state?.bloch_vectors ?? []
   const isFirst = clampedStep === 0
   const isLast  = clampedStep === steps.length - 1
   const total   = steps.length
@@ -182,7 +182,7 @@ export function StepWalkthroughModal({
             <div style={sectionStyle}>
               <div style={sectionLabel}><Activity size={12} />QUBIT STATE AT THIS STEP</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {step.state.qubits.map((qubit) => (
+                {(step.state?.qubits ?? []).map((qubit) => (
                   <div key={qubit.id} style={qubitStateCardStyle}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>{qubit.id}</span>
@@ -200,11 +200,11 @@ export function StepWalkthroughModal({
             </div>
 
             {/* ─ Measurements (if any at this step) ─ */}
-            {step.state.measurements.length > 0 && (
+            {(step.state?.measurements?.length ?? 0) > 0 && (
               <div style={sectionStyle}>
                 <div style={sectionLabel}>📊 MEASUREMENT RESULTS</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {step.state.measurements.map((m, i) => (
+                  {(step.state?.measurements ?? []).map((m, i) => (
                     <div key={i} style={measureRowStyle}>
                       <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>{m.qubit}</span>
                       <span style={{ color: "var(--text-muted)" }}>basis {m.basis}</span>
@@ -339,10 +339,10 @@ export function StepWalkthroughModal({
               )}
 
               {/* Qubit transmission log */}
-              {step.state.transmissions.length > 0 && (
+              {(step.state?.transmissions?.length ?? 0) > 0 && (
                 <div style={transmissionBoxStyle}>
                   <div style={{ ...eyebrowStyle, marginBottom: 10 }}>QUANTUM CHANNEL EVENTS</div>
-                  {step.state.transmissions.map((t, i) => (
+                  {(step.state?.transmissions ?? []).map((t, i) => (
                     <div key={i} style={transmissionRowStyle}>
                       <span style={{ fontFamily: "var(--font-mono)", color: "var(--accent-cyan)" }}>{t.qubit}</span>
                       <span style={{

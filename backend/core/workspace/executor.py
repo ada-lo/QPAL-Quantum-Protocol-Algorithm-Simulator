@@ -18,6 +18,7 @@ from api.schemas.workspace import (
     WorkspaceSimulateResponse,
     WorkspaceSummary,
 )
+from core.engines.base_engine import BaseQuantumEngine
 
 
 H_MAP = {"0": "+", "1": "-", "+": "0", "-": "1", "mixed": "mixed", "uninitialized": "+"}
@@ -572,7 +573,23 @@ def _handle_intercept(
     return f"{actor_name} intercepted {qubit_id} without visible disturbance."
 
 
+class CustomEngine(BaseQuantumEngine):
+    """Custom QPAL pseudocode execution engine."""
+
+    def execute(self, req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
+        return _simulate_workspace_impl(self, req)
+
+
+# Singleton instance for module-level convenience function
+_engine = CustomEngine()
+
+
 def simulate_workspace(req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
+    """Module-level convenience — delegates to CustomEngine."""
+    return _engine.execute(req)
+
+
+def _simulate_workspace_impl(engine: CustomEngine, req: WorkspaceSimulateRequest) -> WorkspaceSimulateResponse:
     qubits: dict[str, dict] = {}
     actors: dict[str, dict] = {}
     measurements: list[MeasurementRecord] = []
@@ -845,15 +862,21 @@ def simulate_workspace(req: WorkspaceSimulateRequest) -> WorkspaceSimulateRespon
 
     final_state = steps[-1].state if steps else _snapshot(qubits, actors, measurements, transmissions, qubit_index_map, mini_sv)
 
-    return WorkspaceSimulateResponse(
-        summary=WorkspaceSummary(
-            qubits=sorted(qubits),
-            actors=sorted(actors),
-            total_steps=len(req.instructions),
-            measurements=len(measurements),
-        ),
+    summary = WorkspaceSummary(
+        qubits=sorted(qubits),
+        actors=sorted(actors),
+        total_steps=len(req.instructions),
+        measurements=len(measurements),
+    )
+
+    # Use the Universal Adapter base class for dynamic schema selection.
+    return engine.format_response(
+        summary=summary,
         steps=steps,
-        final_state=final_state,
-        measurement_results=measurements,
+        actors=list(final_state.actors),
+        transmissions=list(final_state.transmissions),
+        measurements=list(final_state.measurements),
+        statevector=list(final_state.statevector),
+        bloch_vectors=list(final_state.bloch_vectors),
         warnings=warnings,
     )

@@ -21,9 +21,9 @@ from api.schemas.workspace import (
     WorkspaceInstruction,
     WorkspaceQubitState,
     WorkspaceSimulateRequest,
-    WorkspaceSimulateResponse,
     WorkspaceSummary,
 )
+from core.engines.base_engine import BaseQuantumEngine
 
 # ── Eagerly import Qiskit at module level ─────────────────────────────────────
 _QISKIT_AVAILABLE = False
@@ -108,12 +108,11 @@ def _sv_to_probability_state(sv_data, n_qubits: int) -> dict[str, float]:
     return final_state
 
 
-def _error_response(engine: str, message: str) -> WorkspaceSimulateResponse:
-    return WorkspaceSimulateResponse(
-        engine=engine, summary=WorkspaceSummary(), steps=[],
-        final_state=WorkspaceExecutionState(),
-        measurement_results=[], warnings=[f"Engine error: {message}"],
-    )
+class QASMEngine(BaseQuantumEngine):
+    """OpenQASM 3.0 execution engine — Qiskit Statevector-based."""
+
+    def execute(self, req: WorkspaceSimulateRequest):
+        return _execute_qasm_impl(self, req)
 
 
 # ── Main engine ────────────────────────────────────────────────────────────────
@@ -199,7 +198,16 @@ def _noise_model_from_label(label: str, warnings: list[str] | None = None):
         return None
 
 
+# Singleton instance for module-level convenience function
+_engine = QASMEngine()
+
+
 def execute_qasm(req: WorkspaceSimulateRequest):
+    """Module-level convenience — delegates to QASMEngine."""
+    return _engine.execute(req)
+
+
+def _execute_qasm_impl(engine: QASMEngine, req: WorkspaceSimulateRequest):
     if not _QISKIT_AVAILABLE:
         return JSONResponse(
             status_code=200,
@@ -293,17 +301,16 @@ def execute_qasm(req: WorkspaceSimulateRequest):
                 ))
             break
 
-        # Keep legacy workspace payload for backward compatibility while returning
-        # universal step-wise complex amplitudes for the 3D visual adapter.
-        workspace_payload = WorkspaceSimulateResponse(
+        # Build response via the Universal Adapter base class.
+        workspace_payload = engine.format_response(
             engine="openqasm",
             summary=WorkspaceSummary(
                 qubits=[f"q{i}" for i in range(n_qubits)], actors=[],
                 total_steps=len(steps), measurements=len(counts),
             ),
             steps=steps,
-            final_state=final_state,
-            measurement_results=measurement_results,
+            statevector=final_state.statevector,
+            bloch_vectors=list(final_state.bloch_vectors),
             warnings=warnings,
         ).model_dump()
 

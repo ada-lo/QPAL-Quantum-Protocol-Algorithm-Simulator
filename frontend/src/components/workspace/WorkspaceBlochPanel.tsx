@@ -6,7 +6,8 @@ import { BlochScene } from "@/components/bloch/BlochScene"
 import type { WorkspaceBlochVector } from "@/lib/workspace/types"
 
 export function WorkspaceBlochPanel({ blochVectors }: { blochVectors: WorkspaceBlochVector[] }) {
-  if (!blochVectors.length) {
+  // Strict guard: prevent Canvas mount until valid, non-empty data exists
+  if (!blochVectors || blochVectors.length === 0) {
     return (
       <div style={emptyStateStyle}>
         Run a valid program to inspect single-qubit Bloch vectors.
@@ -17,7 +18,11 @@ export function WorkspaceBlochPanel({ blochVectors }: { blochVectors: WorkspaceB
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
       {blochVectors.map((vector) => {
-        const purity = vector.purity ?? Math.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
+        // Sanitize vector values — NaN/undefined in Three.js = Context Lost crash
+        const x = Number.isFinite(vector.x) ? vector.x : 0
+        const y = Number.isFinite(vector.y) ? vector.y : 0
+        const z = Number.isFinite(vector.z) ? vector.z : 0
+        const purity = vector.purity ?? Math.sqrt(x ** 2 + y ** 2 + z ** 2)
         const purityColor = purity >= 0.95 ? "var(--accent-green, #4ade80)" : purity >= 0.4 ? "var(--accent-amber, #fbbf24)" : "var(--accent-red, #f87171)"
         return (
           <div
@@ -52,15 +57,15 @@ export function WorkspaceBlochPanel({ blochVectors }: { blochVectors: WorkspaceB
             <div style={{ height: 190 }}>
               <Canvas camera={{ position: [0, 0, 2.9], fov: 42 }}>
                 <Suspense fallback={null}>
-                  <BlochScene bv={{ x: vector.x, y: vector.y, z: vector.z }} />
+                  <BlochScene bv={{ x, y, z }} />
                   <OrbitControls enablePan={false} enableZoom minDistance={1.8} maxDistance={5.5} autoRotate autoRotateSpeed={0.35} />
                 </Suspense>
               </Canvas>
             </div>
             <div style={{ padding: "10px 14px 14px", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: 11 }}>
-              <div>x={vector.x.toFixed(2)}</div>
-              <div>y={vector.y.toFixed(2)}</div>
-              <div>z={vector.z.toFixed(2)}</div>
+              <div>x={x.toFixed(2)}</div>
+              <div>y={y.toFixed(2)}</div>
+              <div>z={z.toFixed(2)}</div>
               <div style={{ marginTop: 8, color: "var(--text-muted)", fontSize: 10 }}>Scroll or pinch to zoom.</div>
             </div>
           </div>
