@@ -1,5 +1,6 @@
-import { AuthLoading, RedirectToSignIn, SignedIn, SignedOut } from "@neondatabase/neon-js/auth/react/ui"
+import { AuthLoading, SignedIn, SignedOut } from "@neondatabase/neon-js/auth/react/ui"
 import type { CSSProperties, ReactNode } from "react"
+import { Navigate } from "react-router-dom"
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   return (
@@ -14,7 +15,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
       </AuthLoading>
       <SignedIn>{children}</SignedIn>
       <SignedOut>
-        <RedirectToSignIn />
+        <Navigate to="/login" replace />
       </SignedOut>
     </>
   )

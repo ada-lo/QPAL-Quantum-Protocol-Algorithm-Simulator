@@ -1,0 +1,679 @@
+[
+  {
+    "id": "superposition",
+    "name": "Superposition",
+    "wikipedia_query": "Quantum superposition",
+    "arxiv_query": "quantum superposition",
+    "fallback_description": "Superposition lets a quantum state exist as a weighted combination of basis states, which is what gives quantum algorithms their interference-based power.",
+    "complexity": "Core concept",
+    "catalog_key": "deutsch",
+    "steps": [
+      { "title": "Prepare a basis state", "description": "A qubit usually starts in a definite state like |0>. That gives us a clear reference point before any quantum evolution happens." },
+      { "title": "Apply a mixing gate", "description": "A gate such as the Hadamard rotates the qubit into a combination of |0> and |1>. The state now carries amplitudes for multiple outcomes at once." },
+      { "title": "Preserve amplitudes coherently", "description": "While the system stays isolated, the amplitudes evolve together and can later reinforce or cancel one another. That coherent evolution is what algorithms exploit." },
+      { "title": "Measure to get one outcome", "description": "When you finally measure, the superposition collapses to one classical result. The algorithm's job is to shape the amplitudes so the useful result is the most likely one." }
+    ],
+    "prerequisites": ["quantum-gates", "measurement", "hadamard-transform"]
+  },
+  {
+    "id": "quantum-gates",
+    "name": "Quantum Gates",
+    "wikipedia_query": "Quantum logic gate",
+    "arxiv_query": "quantum gate",
+    "fallback_description": "Quantum gates are reversible operations that change amplitudes and phases on one or more qubits, forming the building blocks of quantum circuits.",
+    "complexity": "Core concept",
+    "catalog_key": "qft_3qubit",
+    "steps": [
+      { "title": "Represent the state", "description": "A qubit or register is described by amplitudes rather than a single classical bit value. Gates act directly on that state description." },
+      { "title": "Apply a unitary operation", "description": "Each gate is a mathematically reversible transformation that rotates or entangles amplitudes without losing information." },
+      { "title": "Compose gates into circuits", "description": "Useful algorithms come from chaining many simple gates together. The ordering matters because each step changes the state the next gate sees." },
+      { "title": "Measure at the end", "description": "After the gate sequence has shaped the amplitudes, a measurement turns the quantum state into a classical answer." }
+    ],
+    "prerequisites": ["superposition", "measurement", "entanglement"]
+  },
+  {
+    "id": "measurement",
+    "name": "Measurement",
+    "wikipedia_query": "Measurement in quantum mechanics",
+    "arxiv_query": "quantum measurement",
+    "fallback_description": "Measurement converts a quantum state into a classical outcome, with probabilities determined by the state's amplitudes in the chosen basis.",
+    "complexity": "Core concept",
+    "catalog_key": "bell_pair",
+    "steps": [
+      { "title": "Choose a basis", "description": "A measurement is always made with respect to some basis, such as the computational basis or an alternative rotated basis." },
+      { "title": "Sample according to amplitudes", "description": "The probability of each possible result is determined by the squared magnitude of its amplitude in that basis." },
+      { "title": "Collapse the state", "description": "Once measured, the system is projected onto the observed outcome. The original superposition is no longer available afterward." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates"]
+  },
+  {
+    "id": "oracle",
+    "name": "Oracle",
+    "wikipedia_query": "Oracle machine",
+    "arxiv_query": "quantum oracle",
+    "fallback_description": "A quantum oracle is a black-box subroutine that encodes a function into a reversible operation, allowing the algorithm to query hidden structure coherently.",
+    "complexity": "Core concept",
+    "catalog_key": "deutsch_jozsa",
+    "steps": [
+      { "title": "Encode a hidden function", "description": "The oracle represents information the algorithm wants to learn, such as whether a function is balanced or which item is marked." },
+      { "title": "Act coherently on superpositions", "description": "Instead of querying one classical input at a time, the oracle acts on a superposition of inputs in a single quantum step." },
+      { "title": "Expose structure through interference", "description": "The rest of the circuit turns the phase or amplitude patterns left by the oracle into a measurable signature." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates", "measurement"]
+  },
+  {
+    "id": "interference",
+    "name": "Interference",
+    "wikipedia_query": "Quantum interference",
+    "arxiv_query": "quantum interference",
+    "fallback_description": "Interference is the process by which amplitudes combine, sometimes reinforcing useful outcomes and sometimes canceling unwanted ones.",
+    "complexity": "Core concept",
+    "catalog_key": "deutsch",
+    "steps": [
+      { "title": "Create multiple paths", "description": "Superposition gives the computation several amplitude paths to evolve at once." },
+      { "title": "Adjust relative phases", "description": "Gates and oracles change the sign or angle of amplitudes, setting up how those paths will combine." },
+      { "title": "Recombine the paths", "description": "Later gates bring amplitudes back together so the right answers grow stronger while the wrong ones shrink." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates", "measurement"]
+  },
+  {
+    "id": "entanglement",
+    "name": "Entanglement",
+    "wikipedia_query": "Quantum entanglement",
+    "arxiv_query": "quantum entanglement",
+    "fallback_description": "Entanglement creates correlations between qubits that cannot be explained by independent classical states, making distributed quantum effects possible.",
+    "complexity": "Core concept",
+    "catalog_key": "bell_pair",
+    "steps": [
+      { "title": "Prepare correlated qubits", "description": "A circuit such as Hadamard plus CNOT creates a joint state that cannot be factored into separate single-qubit states." },
+      { "title": "Manipulate the joint system", "description": "Operations on one part of the entangled state affect the full register description, not just one isolated qubit." },
+      { "title": "Use correlations operationally", "description": "Protocols like teleportation and superdense coding rely on these correlations to move information in ways classical systems cannot." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates", "measurement"]
+  },
+  {
+    "id": "phase-kickback",
+    "name": "Phase Kickback",
+    "wikipedia_query": "Phase kickback",
+    "arxiv_query": "phase kickback quantum",
+    "fallback_description": "Phase kickback is the trick where a controlled operation writes useful information into the phase of a control qubit instead of only into a target qubit.",
+    "complexity": "Core concept",
+    "catalog_key": "bernstein_vazirani",
+    "steps": [
+      { "title": "Set up a control-target pair", "description": "A control qubit interacts with a target prepared so that the target's response can be reflected back as a phase." },
+      { "title": "Apply the controlled operation", "description": "The controlled unitary changes the global state in a way that depends on the control value and target structure." },
+      { "title": "Read out the phase indirectly", "description": "Later interference steps reveal the phase pattern as a measurable classical result." }
+    ],
+    "prerequisites": ["oracle", "superposition", "quantum-gates"]
+  },
+  {
+    "id": "hadamard-transform",
+    "name": "Hadamard Transform",
+    "wikipedia_query": "Hadamard transform",
+    "arxiv_query": "Hadamard transform quantum",
+    "fallback_description": "The Hadamard transform spreads a basis state across multiple amplitudes and is one of the main ways quantum circuits enter and exit interference patterns.",
+    "complexity": "Core concept",
+    "catalog_key": "deutsch",
+    "steps": [
+      { "title": "Start in a basis state", "description": "A qubit begins in |0> or |1>, which is easy to prepare and reason about." },
+      { "title": "Apply the Hadamard gate", "description": "The gate maps that state into an equal superposition, differing only by phase depending on the starting value." },
+      { "title": "Use repeated Hadamards strategically", "description": "Many algorithms apply Hadamards both before and after an oracle so hidden phase information can be converted into readable amplitudes." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates"]
+  },
+  {
+    "id": "amplitude-amplification",
+    "name": "Amplitude Amplification",
+    "wikipedia_query": "Amplitude amplification",
+    "arxiv_query": "amplitude amplification",
+    "fallback_description": "Amplitude amplification boosts the probability of desired outcomes by repeatedly marking good states and reflecting amplitudes about their average.",
+    "complexity": "Core concept",
+    "catalog_key": "grover_search",
+    "steps": [
+      { "title": "Prepare a broad superposition", "description": "The register begins spread across many candidate answers so the target is present with small initial weight." },
+      { "title": "Mark good states", "description": "An oracle flips the phase of the desired state or states without explicitly revealing them." },
+      { "title": "Reflect about the mean", "description": "The diffusion step redistributes amplitudes so marked states gain probability while unmarked ones lose some." }
+    ],
+    "prerequisites": ["superposition", "oracle", "interference"]
+  },
+  {
+    "id": "phase-rotation",
+    "name": "Phase Rotation",
+    "wikipedia_query": "Phase shift gate",
+    "arxiv_query": "quantum phase rotation",
+    "fallback_description": "Phase rotations adjust the angle of amplitudes without necessarily changing measurement probabilities immediately, which makes them crucial for interference and Fourier-style circuits.",
+    "complexity": "Core concept",
+    "catalog_key": "qft_3qubit",
+    "steps": [
+      { "title": "Target a specific amplitude component", "description": "A phase gate changes the relative angle of one part of the state with respect to another." },
+      { "title": "Preserve probability magnitudes", "description": "The state can look unchanged to a direct measurement at that moment because the amplitudes' magnitudes stay the same." },
+      { "title": "Reveal the phase later", "description": "Subsequent interference converts those hidden phase differences into visible probability shifts." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates", "interference"]
+  },
+  {
+    "id": "controlled-unitary",
+    "name": "Controlled Unitary",
+    "wikipedia_query": "Controlled NOT gate",
+    "arxiv_query": "controlled unitary quantum",
+    "fallback_description": "A controlled unitary applies an operation only when a control qubit is in the right state, letting circuits build conditional logic while remaining reversible.",
+    "complexity": "Core concept",
+    "catalog_key": "qpe_simple",
+    "steps": [
+      { "title": "Choose a control qubit", "description": "One qubit determines whether the operation should happen or not." },
+      { "title": "Conditionally apply the target gate", "description": "If the control is active, the unitary is applied to the target register; otherwise the target is left alone." },
+      { "title": "Use it to encode structure", "description": "Controlled operations are central in entanglement, phase estimation, oracles, and many deeper algorithms." }
+    ],
+    "prerequisites": ["quantum-gates", "entanglement", "superposition"]
+  },
+  {
+    "id": "ancilla-qubit",
+    "name": "Ancilla Qubit",
+    "wikipedia_query": "Ancilla bit",
+    "arxiv_query": "ancilla qubit",
+    "fallback_description": "An ancilla qubit is a helper qubit introduced to store temporary information, assist reversible computation, or make measurements indirect.",
+    "complexity": "Core concept",
+    "catalog_key": "deutsch_jozsa",
+    "steps": [
+      { "title": "Add workspace to the circuit", "description": "Ancillas give the circuit extra room to compute intermediate values without overwriting useful information." },
+      { "title": "Use the helper during computation", "description": "The ancilla may collect phase information, hold syndromes, or support reversible subroutines." },
+      { "title": "Uncompute or measure it carefully", "description": "Good circuits either return ancillas to a clean state or measure them in a way that preserves the main computation's meaning." }
+    ],
+    "prerequisites": ["quantum-gates", "measurement", "controlled-unitary"]
+  },
+  {
+    "id": "amplitude-encoding",
+    "name": "Amplitude Encoding",
+    "wikipedia_query": "Quantum machine learning",
+    "arxiv_query": "amplitude encoding quantum machine learning",
+    "fallback_description": "Amplitude encoding stores classical data in the amplitudes of a quantum state, allowing algorithms to compare or process vectors in quantum form.",
+    "complexity": "Core concept",
+    "catalog_key": "qsvm",
+    "steps": [
+      { "title": "Normalize the data", "description": "A classical vector must first be scaled so it can represent a valid quantum state's amplitudes." },
+      { "title": "Prepare the state", "description": "The circuit loads that vector into a register, which is often one of the hardest parts of a practical quantum ML routine." },
+      { "title": "Process overlaps and features", "description": "Once encoded, the state can be compared or transformed using quantum operations suited to similarity estimation or learning tasks." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates", "measurement"]
+  },
+  {
+    "id": "variational-circuit",
+    "name": "Variational Circuit",
+    "wikipedia_query": "Variational quantum eigensolver",
+    "arxiv_query": "variational quantum circuit",
+    "fallback_description": "A variational circuit is a parameterized quantum circuit whose angles are tuned by a classical optimizer to minimize or maximize an objective.",
+    "complexity": "Core concept",
+    "catalog_key": "vqe_h2",
+    "steps": [
+      { "title": "Choose a parameterized ansatz", "description": "The circuit structure includes tunable rotation angles that define a family of candidate quantum states." },
+      { "title": "Measure an objective", "description": "For each parameter setting, the quantum computer estimates a cost such as energy, classification loss, or cut value." },
+      { "title": "Update parameters classically", "description": "A classical optimizer proposes better parameters and the loop repeats until the objective improves enough." }
+    ],
+    "prerequisites": ["quantum-gates", "measurement", "entanglement"]
+  },
+  {
+    "id": "error-correction",
+    "name": "Error Correction",
+    "wikipedia_query": "Quantum error correction",
+    "arxiv_query": "quantum error correction",
+    "fallback_description": "Quantum error correction protects fragile quantum information by encoding logical states across multiple physical qubits and extracting syndromes without directly measuring the state.",
+    "complexity": "Core concept",
+    "catalog_key": "qec_3qubit_repetition",
+    "steps": [
+      { "title": "Encode redundancy", "description": "Logical information is spread across multiple qubits so that single physical faults do not destroy the message." },
+      { "title": "Measure syndromes indirectly", "description": "Auxiliary checks reveal which kind of error likely happened without exposing the protected logical amplitudes." },
+      { "title": "Apply a correction", "description": "Based on the syndrome, the circuit or controller reverses the inferred error and restores the logical state." }
+    ],
+    "prerequisites": ["entanglement", "measurement", "ancilla-qubit"]
+  },
+  {
+    "id": "bell-pair",
+    "name": "Bell Pair",
+    "wikipedia_query": "Bell state",
+    "arxiv_query": "Bell pair quantum",
+    "fallback_description": "A Bell pair is a maximally entangled two-qubit state used as a standard resource for teleportation, superdense coding, and distributed quantum protocols.",
+    "complexity": "Core concept",
+    "catalog_key": "bell_pair",
+    "steps": [
+      { "title": "Prepare two clean qubits", "description": "Both qubits typically begin in simple basis states so the entangling operation has a known starting point." },
+      { "title": "Entangle them with H and CNOT", "description": "A Hadamard on one qubit followed by a controlled-NOT creates a correlated state such as (|00> + |11>)/sqrt(2)." },
+      { "title": "Use the pair as a resource", "description": "Once distributed, the Bell pair enables tasks that require nonclassical shared correlations between distant parties." }
+    ],
+    "prerequisites": ["entanglement", "quantum-gates", "measurement"]
+  },
+  {
+    "id": "classical-communication",
+    "name": "Classical Communication",
+    "wikipedia_query": "Classical communication",
+    "arxiv_query": "classical communication quantum protocol",
+    "fallback_description": "Many quantum protocols still need ordinary classical messages to complete coordination, apply corrections, or compare measurement choices.",
+    "complexity": "Core concept",
+    "catalog_key": "teleportation_simplified",
+    "steps": [
+      { "title": "Extract a classical bit string", "description": "A measurement outcome or control decision is converted into ordinary classical information." },
+      { "title": "Send the message over a normal channel", "description": "That information can be copied, stored, and transmitted using standard communication methods." },
+      { "title": "Finish the protocol with corrections", "description": "The receiving party uses the classical message to choose a recovery, comparison, or next protocol step." }
+    ],
+    "prerequisites": ["measurement", "bell-pair", "entanglement"]
+  },
+  {
+    "id": "deutsch",
+    "name": "Deutsch Algorithm",
+    "wikipedia_query": "Deutsch algorithm",
+    "arxiv_query": "Deutsch algorithm",
+    "fallback_description": "Deutsch's algorithm distinguishes constant and balanced single-bit Boolean oracles with one quantum query by combining phase kickback with interference.",
+    "complexity": "O(1) oracle query",
+    "catalog_key": "deutsch",
+    "steps": [
+      { "title": "Prepare the input and ancilla", "description": "Start with one query qubit and one helper qubit, then apply Hadamard gates so the circuit can evaluate both possible inputs coherently." },
+      { "title": "Call the oracle once", "description": "The oracle acts on the superposed input and writes information about the hidden function into the phase of the state." },
+      { "title": "Interfere the amplitudes", "description": "A final Hadamard on the query qubit turns the hidden phase pattern into a measurable classical signal." },
+      { "title": "Read the result", "description": "Measuring the query qubit tells you whether the oracle was constant or balanced after only one query." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates", "measurement"]
+  },
+  {
+    "id": "deutsch-jozsa",
+    "name": "Deutsch-Jozsa Algorithm",
+    "wikipedia_query": "Deutsch–Jozsa algorithm",
+    "arxiv_query": "Deutsch-Jozsa algorithm",
+    "fallback_description": "Deutsch-Jozsa generalizes the Deutsch setting to n-bit oracles, deciding whether a promised function is constant or balanced with a single coherent query.",
+    "complexity": "O(1) oracle query under the promise",
+    "catalog_key": "deutsch_jozsa",
+    "steps": [
+      { "title": "Create a superposition over inputs", "description": "Apply Hadamard gates to all query qubits so the oracle sees every possible input at once." },
+      { "title": "Use an ancilla to capture phase", "description": "The helper qubit is prepared so the oracle's effect is written into phase rather than only into output bits." },
+      { "title": "Apply the oracle once", "description": "The balanced-versus-constant structure changes the phase pattern across the input register in one coherent query." },
+      { "title": "Undo with Hadamards and measure", "description": "A second layer of Hadamards converts that phase pattern into a simple measurement signature: all zeros or not." }
+    ],
+    "prerequisites": ["deutsch", "oracle", "interference"]
+  },
+  {
+    "id": "bernstein-vazirani",
+    "name": "Bernstein-Vazirani Algorithm",
+    "wikipedia_query": "Bernstein–Vazirani algorithm",
+    "arxiv_query": "Bernstein-Vazirani algorithm",
+    "fallback_description": "Bernstein-Vazirani recovers a hidden bit string in one oracle call by encoding the secret into relative phases and decoding it with Hadamard interference.",
+    "complexity": "O(1) oracle query",
+    "catalog_key": "bernstein_vazirani",
+    "steps": [
+      { "title": "Prepare the query register", "description": "All input qubits are placed into superposition so they can probe every relevant bit pattern simultaneously." },
+      { "title": "Apply the hidden-string oracle", "description": "The oracle uses phase kickback so the secret string is imprinted into the phase structure of the input register." },
+      { "title": "Run Hadamards again", "description": "The second Hadamard layer decodes the phase pattern directly into the computational basis." },
+      { "title": "Measure the full string", "description": "One measurement of the register reveals the hidden bit string in a single query." }
+    ],
+    "prerequisites": ["deutsch-jozsa", "phase-kickback", "hadamard-transform"]
+  },
+  {
+    "id": "simons-algorithm",
+    "name": "Simon's Algorithm",
+    "wikipedia_query": "Simon's problem",
+    "arxiv_query": "Simon's algorithm",
+    "fallback_description": "Simon's algorithm samples linear equations orthogonal to a hidden xor mask and solves them classically, giving an exponential separation over brute-force search.",
+    "complexity": "Polynomial-time quantum queries",
+    "catalog_key": "simon",
+    "steps": [
+      { "title": "Superpose all candidate inputs", "description": "The input register is spread over every possible bit string so the oracle can act on them together." },
+      { "title": "Query the two-to-one oracle", "description": "The oracle maps paired inputs with the same hidden xor relation to the same output state." },
+      { "title": "Measure the output register", "description": "That measurement leaves the input register in a structured superposition tied to the hidden period." },
+      { "title": "Collect equations from repeated runs", "description": "After another interference step and measurement, each run yields a linear constraint that helps recover the secret string." }
+    ],
+    "prerequisites": ["superposition", "oracle", "measurement"]
+  },
+  {
+    "id": "grovers-search",
+    "name": "Grover's Search",
+    "wikipedia_query": "Grover's algorithm",
+    "arxiv_query": "Grover search algorithm",
+    "fallback_description": "Grover's search alternates oracle phase marking with diffusion to amplify a target basis state, reducing unstructured search from linear to square-root query complexity.",
+    "complexity": "O(sqrt(N)) queries",
+    "catalog_key": "grover_search",
+    "steps": [
+      { "title": "Initialize a uniform search state", "description": "Hadamard gates spread amplitude equally across all candidate answers in the search space." },
+      { "title": "Mark the target with the oracle", "description": "The oracle flips the phase of the desired state without directly revealing which one it is." },
+      { "title": "Apply the diffusion operator", "description": "A reflection about the average amplitude boosts the marked state while slightly reducing the rest." },
+      { "title": "Repeat and then measure", "description": "After enough iterations, the target state's probability becomes high enough that a final measurement likely returns it." }
+    ],
+    "prerequisites": ["superposition", "oracle", "amplitude-amplification"]
+  },
+  {
+    "id": "qft",
+    "name": "Quantum Fourier Transform",
+    "wikipedia_query": "Quantum Fourier transform",
+    "arxiv_query": "quantum Fourier transform",
+    "fallback_description": "The quantum Fourier transform applies structured phase rotations and swaps to map computational-basis amplitudes into the frequency domain with polylogarithmic depth.",
+    "complexity": "O(n^2) gates in the standard circuit",
+    "catalog_key": "qft_3qubit",
+    "steps": [
+      { "title": "Start with an encoded register", "description": "The input register holds amplitudes or phases that represent the signal or computational pattern you want to transform." },
+      { "title": "Apply layered Hadamards and controlled phases", "description": "Each qubit receives a Hadamard and conditional phase rotations that accumulate frequency-style information from the lower-order qubits." },
+      { "title": "Reverse qubit order with swaps", "description": "A final bit-reversal step restores the conventional ordering of the transformed output register." },
+      { "title": "Use the transformed state downstream", "description": "The result is often not measured immediately but fed into larger algorithms such as phase estimation or period finding." }
+    ],
+    "prerequisites": ["quantum-gates", "phase-rotation", "interference"]
+  },
+  {
+    "id": "quantum-phase-estimation",
+    "name": "Quantum Phase Estimation",
+    "wikipedia_query": "Quantum phase estimation algorithm",
+    "arxiv_query": "quantum phase estimation",
+    "fallback_description": "Quantum phase estimation extracts eigenphases by coupling a target unitary to an estimation register and decoding the phase pattern with the inverse quantum Fourier transform.",
+    "complexity": "Polynomial in precision and controlled-unitary cost",
+    "catalog_key": "qpe_simple",
+    "steps": [
+      { "title": "Prepare estimation qubits and an eigenstate", "description": "One register is set up to record the phase while another holds a state that responds predictably to the chosen unitary." },
+      { "title": "Apply controlled powers of the unitary", "description": "Each estimation qubit controls a different power of the unitary, building a binary representation of the phase into the system." },
+      { "title": "Run the inverse QFT", "description": "The inverse quantum Fourier transform reorganizes the phase information into readable basis-state amplitudes." },
+      { "title": "Measure the estimation register", "description": "The measurement returns a bit string that approximates the eigenphase." }
+    ],
+    "prerequisites": ["qft", "controlled-unitary", "ancilla-qubit"]
+  },
+  {
+    "id": "shors-algorithm",
+    "name": "Shor's Algorithm - Factorization",
+    "wikipedia_query": "Shor's algorithm",
+    "arxiv_query": "Shor algorithm factorization",
+    "fallback_description": "Shor's algorithm reduces integer factorization to order finding, pairing modular arithmetic with quantum period finding for exponential asymptotic speedup over classical factoring.",
+    "complexity": "Polynomial time in log(N)",
+    "catalog_key": "shor_factorization",
+    "steps": [
+      { "title": "Reduce factoring to period finding", "description": "The algorithm reformulates the factoring problem so that finding a modular period is the central quantum task." },
+      { "title": "Build a periodic quantum state", "description": "A superposition of exponents and modular arithmetic create a state whose structure repeats with the hidden order." },
+      { "title": "Extract the period with QFT-style interference", "description": "A Fourier-based readout turns the periodic pattern into peaks that reveal the order information." },
+      { "title": "Finish classically", "description": "Classical number theory uses the recovered order to derive nontrivial factors of the integer." }
+    ],
+    "prerequisites": ["qft", "quantum-phase-estimation", "superposition"]
+  },
+  {
+    "id": "hhl-algorithm",
+    "name": "HHL Algorithm",
+    "wikipedia_query": "HHL algorithm",
+    "arxiv_query": "HHL algorithm",
+    "fallback_description": "The HHL algorithm solves certain sparse linear systems by encoding the solution into a quantum state using phase estimation, controlled rotations, and uncomputation.",
+    "complexity": "Polylogarithmic in dimension under strong assumptions",
+    "catalog_key": "hhl_algorithm",
+    "steps": [
+      { "title": "Encode the right-hand-side vector", "description": "The input vector is loaded into a quantum state so the system of equations is represented in amplitude form." },
+      { "title": "Estimate eigenvalues", "description": "Phase estimation approximates the matrix's eigenvalue information on a helper register." },
+      { "title": "Apply controlled inversion logic", "description": "A controlled rotation uses those estimated eigenvalues to weight amplitudes by inverse eigenvalue factors." },
+      { "title": "Uncompute and measure", "description": "After removing temporary information, the remaining quantum state encodes the solution up to normalization." }
+    ],
+    "prerequisites": ["quantum-phase-estimation", "qft", "controlled-unitary"]
+  },
+  {
+    "id": "qsvm",
+    "name": "QSVM Algorithm",
+    "wikipedia_query": "Quantum support vector machine",
+    "arxiv_query": "quantum support vector machine",
+    "fallback_description": "Quantum support vector machines use quantum feature maps or kernel estimation routines to classify data in high-dimensional Hilbert spaces.",
+    "complexity": "Varies by feature map and kernel estimation cost",
+    "catalog_key": "qsvm",
+    "steps": [
+      { "title": "Encode the input data", "description": "Classical features are embedded into quantum states using a chosen feature map or amplitude encoding routine." },
+      { "title": "Estimate kernel similarity", "description": "The circuit measures overlaps between encoded states to build a quantum-informed notion of similarity." },
+      { "title": "Train or evaluate the classifier", "description": "Those similarities are used inside a support-vector-style decision boundary to separate labeled examples." }
+    ],
+    "prerequisites": ["amplitude-encoding", "quantum-gates", "measurement"]
+  },
+  {
+    "id": "qkmean",
+    "name": "QKmean Algorithm",
+    "wikipedia_query": "k-means clustering",
+    "arxiv_query": "quantum k-means",
+    "fallback_description": "Quantum k-means variants use overlap estimation, swap tests, or amplitude encodings to accelerate distance evaluation in clustering workflows.",
+    "complexity": "Depends on state preparation and distance routine",
+    "catalog_key": "qkmean",
+    "steps": [
+      { "title": "Encode data points and centroids", "description": "Both samples and candidate cluster centers are represented as quantum states." },
+      { "title": "Estimate similarity or distance", "description": "The circuit uses a quantum subroutine to compare each sample against available centroids." },
+      { "title": "Update cluster assignments", "description": "Based on those comparisons, the algorithm reassigns samples and updates the centroids iteratively." }
+    ],
+    "prerequisites": ["amplitude-encoding", "measurement", "quantum-gates"]
+  },
+  {
+    "id": "qknn",
+    "name": "QKNN Algorithm",
+    "wikipedia_query": "k-nearest neighbors algorithm",
+    "arxiv_query": "quantum nearest neighbors",
+    "fallback_description": "Quantum nearest-neighbor methods use encoded feature states and quantum similarity estimation to compare data points for classification.",
+    "complexity": "Depends on encoding and similarity oracle cost",
+    "catalog_key": "qknn",
+    "steps": [
+      { "title": "Prepare the query and reference states", "description": "The unknown sample and stored training examples are loaded into quantum representations." },
+      { "title": "Estimate pairwise similarity", "description": "A quantum subroutine measures how close the query is to each candidate neighbor." },
+      { "title": "Vote from the nearest results", "description": "The closest matches determine the label or category assigned to the query sample." }
+    ],
+    "prerequisites": ["amplitude-encoding", "measurement", "interference"]
+  },
+  {
+    "id": "qhc",
+    "name": "QHC Algorithm",
+    "wikipedia_query": "Hierarchical clustering",
+    "arxiv_query": "quantum hierarchical clustering",
+    "fallback_description": "Quantum hierarchical clustering approaches estimate pairwise similarities in encoded spaces to build dendrogram-style cluster structures.",
+    "complexity": "Driven by similarity estimation and merge schedule",
+    "catalog_key": "qhc",
+    "steps": [
+      { "title": "Encode the dataset", "description": "Each data point is mapped into a quantum state that can be compared against the others." },
+      { "title": "Compute pairwise closeness", "description": "Quantum similarity routines estimate which clusters or points should merge first." },
+      { "title": "Build the hierarchy", "description": "The clustering tree is assembled by repeatedly merging the most similar groups." }
+    ],
+    "prerequisites": ["amplitude-encoding", "measurement", "quantum-gates"]
+  },
+  {
+    "id": "qpca",
+    "name": "QPCA Algorithm",
+    "wikipedia_query": "Principal component analysis",
+    "arxiv_query": "quantum principal component analysis",
+    "fallback_description": "Quantum PCA extracts dominant eigencomponents of a density operator or covariance-like object using phase-estimation-style primitives.",
+    "complexity": "Depends on access model to the density operator",
+    "catalog_key": "qpca",
+    "steps": [
+      { "title": "Represent the covariance-like object", "description": "The dataset must be available in a form that the quantum routine can treat like a density operator or matrix." },
+      { "title": "Use phase-estimation machinery", "description": "Eigenvalue and eigenvector information is extracted with a phase-estimation-style procedure." },
+      { "title": "Interpret dominant components", "description": "The largest components describe the principal structure of the data, similar to classical PCA." }
+    ],
+    "prerequisites": ["quantum-phase-estimation", "amplitude-encoding", "measurement"]
+  },
+  {
+    "id": "qperceptron",
+    "name": "QPerceptron Algorithm",
+    "wikipedia_query": "Perceptron",
+    "arxiv_query": "quantum perceptron",
+    "fallback_description": "Quantum perceptron models adapt thresholded learning ideas to parameterized quantum circuits and measurement-based outputs.",
+    "complexity": "Training cost depends on ansatz and optimizer",
+    "catalog_key": "qperceptron",
+    "steps": [
+      { "title": "Encode inputs into a circuit", "description": "Features are mapped into a small quantum register using a chosen embedding." },
+      { "title": "Apply trainable transformations", "description": "Parameterized gates act like learnable weights, changing the quantum state's orientation." },
+      { "title": "Measure and threshold the output", "description": "The measured signal is interpreted as a binary or class decision and compared with the target label." }
+    ],
+    "prerequisites": ["variational-circuit", "measurement", "quantum-gates"]
+  },
+  {
+    "id": "qnn",
+    "name": "QNN Algorithm",
+    "wikipedia_query": "Quantum neural network",
+    "arxiv_query": "quantum neural network",
+    "fallback_description": "Quantum neural networks use trainable parameterized circuits as differentiable models for classification, regression, and generative learning.",
+    "complexity": "Training cost depends on circuit depth and optimization loop",
+    "catalog_key": "qnn",
+    "steps": [
+      { "title": "Embed the input data", "description": "Classical features are first encoded into a quantum state the network can process." },
+      { "title": "Run parameterized layers", "description": "Trainable rotations and entangling gates act like the learnable layers of a classical neural model." },
+      { "title": "Measure and optimize", "description": "Measurements produce outputs that are scored by a loss function, and a classical optimizer tunes the parameters." }
+    ],
+    "prerequisites": ["variational-circuit", "entanglement", "measurement"]
+  },
+  {
+    "id": "qaoa-maxcut",
+    "name": "QAOA MaxCut",
+    "wikipedia_query": "Quantum approximate optimization algorithm",
+    "arxiv_query": "QAOA MaxCut",
+    "fallback_description": "QAOA alternates cost and mixer layers to variationally optimize combinatorial objectives, with MaxCut as a standard benchmark problem.",
+    "complexity": "Depends on depth p and optimization budget",
+    "catalog_key": "qaoa_maxcut",
+    "steps": [
+      { "title": "Prepare a uniform starting state", "description": "The qubits begin in a superposition that represents all candidate cut assignments at once." },
+      { "title": "Apply a cost layer", "description": "Problem-specific phase rotations reward assignments that satisfy more of the target objective." },
+      { "title": "Apply a mixer layer", "description": "A second set of gates redistributes amplitudes so the algorithm can continue exploring new assignments." },
+      { "title": "Optimize the angles", "description": "A classical outer loop tunes the layer parameters until high-quality cuts become likely at measurement." }
+    ],
+    "prerequisites": ["variational-circuit", "superposition", "measurement"]
+  },
+  {
+    "id": "vqe-ansatz-h2",
+    "name": "VQE Ansatz (H2 molecule)",
+    "wikipedia_query": "Variational quantum eigensolver",
+    "arxiv_query": "variational quantum eigensolver H2",
+    "fallback_description": "Variational quantum eigensolvers estimate molecular ground-state energies by preparing an ansatz, measuring Hamiltonian terms, and optimizing parameters classically.",
+    "complexity": "Hybrid iterative optimization with repeated measurements",
+    "catalog_key": "vqe_h2",
+    "steps": [
+      { "title": "Choose an ansatz for the molecule", "description": "A parameterized circuit defines the family of candidate states used to approximate the molecule's ground state." },
+      { "title": "Measure the Hamiltonian expectation", "description": "The circuit is executed many times to estimate the energy contributed by the molecule's terms." },
+      { "title": "Update parameters classically", "description": "A classical optimizer searches for parameter values that minimize the measured energy." }
+    ],
+    "prerequisites": ["variational-circuit", "measurement", "entanglement"]
+  },
+  {
+    "id": "quantum-walk-1d",
+    "name": "Quantum Walk (1D)",
+    "wikipedia_query": "Quantum walk",
+    "arxiv_query": "one-dimensional quantum walk",
+    "fallback_description": "Discrete-time quantum walks use a coin-plus-shift construction to spread amplitudes ballistically across a graph or line.",
+    "complexity": "Linear in walk depth for the simulated circuit",
+    "catalog_key": "quantum_walk_1d",
+    "steps": [
+      { "title": "Prepare a coin and position register", "description": "One part of the state chooses direction while the rest tracks where the walker is on the line." },
+      { "title": "Flip the coin into superposition", "description": "The coin qubit is mixed so the walker can move left and right at the same time." },
+      { "title": "Shift conditionally on the coin", "description": "A conditional move entangles direction with position and spreads the walk across the graph." },
+      { "title": "Repeat to build the distribution", "description": "Multiple rounds produce a sharply structured probability pattern shaped by quantum interference." }
+    ],
+    "prerequisites": ["superposition", "quantum-gates", "interference"]
+  },
+  {
+    "id": "qec-3-qubit-repetition-code",
+    "name": "QEC: 3-Qubit Repetition Code",
+    "wikipedia_query": "Quantum error correction",
+    "arxiv_query": "three qubit repetition code quantum error correction",
+    "fallback_description": "The three-qubit repetition code protects against single bit-flip errors using redundancy, syndrome extraction, and corrective decoding.",
+    "complexity": "Constant-size encoding for single bit-flip correction",
+    "catalog_key": "qec_3qubit_repetition",
+    "steps": [
+      { "title": "Encode one logical bit into three qubits", "description": "Redundancy spreads the logical information across three physical lines." },
+      { "title": "Detect a mismatch with syndromes", "description": "Parity-style checks reveal whether one qubit has likely flipped without directly reading the logical state." },
+      { "title": "Correct the identified error", "description": "Once the failing line is known, a targeted bit flip restores the encoded logical value." }
+    ],
+    "prerequisites": ["error-correction", "measurement", "ancilla-qubit"]
+  },
+  {
+    "id": "qec-shors-nine-qubit-code",
+    "name": "QEC: Shor's Nine-Qubit Code",
+    "wikipedia_query": "Shor code",
+    "arxiv_query": "Shor nine qubit code",
+    "fallback_description": "Shor's nine-qubit code combines repetition in complementary bases to correct arbitrary single-qubit bit-flip and phase-flip errors.",
+    "complexity": "Constant-size code for arbitrary single-qubit error correction",
+    "catalog_key": "qec_shor_9qubit",
+    "steps": [
+      { "title": "Nest repetition across two bases", "description": "The code protects against both bit flips and phase flips by combining different redundancy patterns." },
+      { "title": "Extract multiple syndromes", "description": "Separate checks identify which type of error happened and where it occurred." },
+      { "title": "Apply the corresponding recovery", "description": "With the syndrome information in hand, the code reverses the single-qubit error and restores the logical state." }
+    ],
+    "prerequisites": ["error-correction", "entanglement", "measurement"]
+  },
+  {
+    "id": "bb84",
+    "name": "BB84 With Eve",
+    "wikipedia_query": "BB84",
+    "arxiv_query": "BB84 quantum key distribution",
+    "fallback_description": "BB84 is a prepare-and-measure key distribution protocol where basis mismatch statistics reveal eavesdropping through an elevated quantum bit error rate.",
+    "complexity": "Linear rounds with basis sifting",
+    "catalog_key": "bb84_eavesdrop",
+    "steps": [
+      { "title": "Alice prepares random bits and bases", "description": "Each transmitted qubit is encoded using one of two possible bases so an eavesdropper cannot copy it safely." },
+      { "title": "Bob measures in random bases", "description": "Bob receives each qubit and chooses his measurement basis independently, which means some rounds will match Alice and some will not." },
+      { "title": "They sift matching rounds", "description": "Alice and Bob publicly compare only the bases, keeping the rounds where they happened to match." },
+      { "title": "They estimate the error rate", "description": "If Eve disturbed too many qubits, the sifted key shows too many errors and the protocol is aborted." }
+    ],
+    "prerequisites": ["superposition", "measurement", "quantum-gates"]
+  },
+  {
+    "id": "quantum-teleportation",
+    "name": "Teleportation Walkthrough",
+    "wikipedia_query": "Quantum teleportation",
+    "arxiv_query": "quantum teleportation",
+    "fallback_description": "Quantum teleportation transfers an unknown qubit state using a shared entangled pair, a Bell-basis measurement, and two classical correction bits.",
+    "complexity": "1 Bell pair + 2 classical bits",
+    "catalog_key": "teleportation_simplified",
+    "steps": [
+      { "title": "Share an entangled Bell pair", "description": "Alice and Bob begin by holding one qubit each from a previously prepared entangled pair." },
+      { "title": "Entangle the message with Alice's half", "description": "Alice combines the unknown state with her Bell-pair qubit and performs a Bell-basis style measurement." },
+      { "title": "Send two classical bits", "description": "The measurement outcome is ordinary classical information, so Alice can transmit it over a normal channel." },
+      { "title": "Bob applies the recovery", "description": "Using those two bits, Bob chooses the right correction gate and reconstructs the original unknown state on his qubit." }
+    ],
+    "prerequisites": ["entanglement", "bell-pair", "classical-communication"]
+  },
+  {
+    "id": "superdense-coding",
+    "name": "Superdense Coding",
+    "wikipedia_query": "Superdense coding",
+    "arxiv_query": "superdense coding",
+    "fallback_description": "Superdense coding uses a shared Bell pair so that one transmitted qubit can communicate two classical bits after an entangling decode.",
+    "complexity": "1 transmitted qubit + shared entanglement",
+    "catalog_key": "superdense_simplified",
+    "steps": [
+      { "title": "Share an entangled pair", "description": "Alice and Bob first hold opposite halves of a Bell pair that acts as a communication resource." },
+      { "title": "Encode two classical bits locally", "description": "Alice applies one of four possible gate patterns to her qubit, choosing an operation that represents the message." },
+      { "title": "Send one qubit to Bob", "description": "Only Alice's single qubit is transmitted, while the shared entanglement carries the extra structure." },
+      { "title": "Decode with a joint measurement", "description": "Bob performs the right two-qubit operations and measurements to recover both classical bits." }
+    ],
+    "prerequisites": ["bell-pair", "entanglement", "classical-communication"]
+  },
+  {
+    "id": "n-qubit-teleportation",
+    "name": "N-Qubit Teleportation",
+    "wikipedia_query": "Quantum teleportation",
+    "arxiv_query": "multi qubit quantum teleportation",
+    "fallback_description": "Multi-qubit teleportation extends the standard protocol by teleporting each component through coordinated entanglement resources and classical corrections.",
+    "complexity": "Scales with payload qubits and Bell channels",
+    "catalog_key": "n_qubit_teleportation",
+    "steps": [
+      { "title": "Prepare one Bell channel per payload qubit", "description": "Each qubit in the message needs matching entanglement resources so the full register can be transferred safely." },
+      { "title": "Measure each payload with its local channel", "description": "Alice performs teleportation-style operations for every qubit she wants to move." },
+      { "title": "Send the classical correction data", "description": "The measurement results are transmitted so Bob knows how to recover each teleported qubit." },
+      { "title": "Reassemble the full register", "description": "Bob applies the required corrections across all received qubits, reconstructing the multi-qubit state." }
+    ],
+    "prerequisites": ["quantum-teleportation", "bell-pair", "classical-communication"]
+  },
+  {
+    "id": "veto-algorithm",
+    "name": "Veto Algorithm",
+    "wikipedia_query": "Quantum information",
+    "arxiv_query": "quantum veto protocol",
+    "fallback_description": "Quantum veto protocols let one or more participants anonymously block a shared decision using entanglement-assisted multiparty coordination.",
+    "complexity": "Multiparty protocol with shared entanglement rounds",
+    "catalog_key": "veto_algorithm",
+    "steps": [
+      { "title": "Distribute shared quantum resources", "description": "Participants begin with correlated quantum states that encode group-wide information without revealing personal choices yet." },
+      { "title": "Let each participant act privately", "description": "Anyone who wants to veto applies a local operation, while others follow the neutral branch of the protocol." },
+      { "title": "Collect a joint outcome", "description": "A shared measurement or comparison step reveals whether any veto occurred without exposing who applied it." }
+    ],
+    "prerequisites": ["entanglement", "measurement", "classical-communication"]
+  },
+  {
+    "id": "qpc-socialist-millionaire",
+    "name": "QPC (Socialist Millionaire)",
+    "wikipedia_query": "Socialist millionaire problem",
+    "arxiv_query": "quantum private comparison socialist millionaire",
+    "fallback_description": "Quantum private comparison protocols allow parties to compare secrets, such as equality, without revealing the secrets themselves.",
+    "complexity": "Secure comparison with communication and verification rounds",
+    "catalog_key": "qpc_socialist_millionaire",
+    "steps": [
+      { "title": "Encode private values indirectly", "description": "Each party contributes information to the protocol without sending the secret itself in plain classical form." },
+      { "title": "Use shared quantum correlations and checks", "description": "Quantum states and measurements let the protocol detect agreement or mismatch while limiting information leakage." },
+      { "title": "Reveal only the comparison result", "description": "At the end, the parties learn whether the values match, but not the values themselves." }
+    ],
+    "prerequisites": ["entanglement", "measurement", "classical-communication"]
+  }
+]

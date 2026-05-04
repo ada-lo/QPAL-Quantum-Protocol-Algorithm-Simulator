@@ -4,12 +4,14 @@ import * as Tooltip from "@radix-ui/react-tooltip"
 import { UserButton } from "@neondatabase/neon-js/auth/react/ui"
 import { BookOpenText, ChevronDown, CircleHelp, Cpu, House, Info, Menu, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { Editor } from "@monaco-editor/react"
 
 import { SignOutButton } from "@/components/auth/SignOutButton"
 import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
+import { AppModeToggle } from "@/components/shared/AppModeToggle"
 import { useThemeMode } from "@/hooks/useThemeMode"
+import { setStoredAppMode } from "@/lib/appMode"
 import { LEARNING_EXPERIENCES, type LearningExperience } from "@/lib/quantum/learningCatalog"
 import { PRESETS, type CircuitPreset } from "@/lib/quantum/presets"
 import { fetchPublicWorkspaceCatalog, runWorkspaceBenchmarks, simulateWorkspaceProgram } from "@/lib/workspace/api"
@@ -236,6 +238,8 @@ function circuitSignature(input: { nQubits: number; gates: Omit<CircuitGate, "id
 }
 
 export function WorkspacePage() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [source, setSource] = useState(DEFAULT_PROGRAM)
   const [catalog, setCatalog] = useState<WorkspaceCatalogResponse | null>(null)
   const [simulation, setSimulation] = useState<WorkspaceSimulationResponse | null>(null)
@@ -256,6 +260,7 @@ export function WorkspacePage() {
   const { theme, setTheme } = useThemeMode()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const executionTokenRef = useRef(0)
+  const requestedTemplateRef = useRef<string | null>(null)
   // Sync guard: set to true while the parser is writing to the circuit store
   // so the Visual→Text effect ignores that echo update.
   const isParserWritingRef = useRef(false)
@@ -283,6 +288,10 @@ export function WorkspacePage() {
   const setEngine = useSimStore((s) => s.setEngine)
   const activeTemplateCategory = useSimStore((s) => s.activeTemplateCategory)
   const activeTemplateBaseCode = useSimStore((s) => s.activeTemplateBaseCode)
+
+  useEffect(() => {
+    setStoredAppMode("researcher")
+  }, [])
 
   // Sync store's template code to editor when it changes (e.g., after engine switch)
   useEffect(() => {
@@ -395,6 +404,16 @@ export function WorkspacePage() {
       setSelectedModelValue(selectionOptions[0].value)
     }
   }, [selectionOptions, selectedModelValue])
+
+  useEffect(() => {
+    const templateId = searchParams.get("template")
+    if (!templateId || requestedTemplateRef.current === templateId) return
+    const template = templateById.get(templateId)
+    if (!template) return
+    requestedTemplateRef.current = templateId
+    applyTemplateById(templateId)
+    navigate("/workspace", { replace: true })
+  }, [navigate, searchParams, templateById])
 
   // Simulation is only triggered by explicit user action (Run button).
   // No auto-run on source change.
@@ -691,6 +710,10 @@ export function WorkspacePage() {
               <House size={14} />
               Home
             </Link>
+            <Link to="/explore" style={headerLinkButtonStyle}>
+              <BookOpenText size={14} />
+              Explore
+            </Link>
             <button
               type="button"
               style={{ ...headerExecButtonStyle, borderColor: "var(--accent-green)", color: "var(--accent-green)" }}
@@ -708,6 +731,7 @@ export function WorkspacePage() {
               <RotateCcw size={14} />
               Reset
             </button>
+            <AppModeToggle />
             <ThemeToggleButton label="Dark" active={theme === "dark"} onClick={() => setTheme("dark")} />
             <ThemeToggleButton label="Light" active={theme === "light"} onClick={() => setTheme("light")} />
             <SignOutButton style={headerExecButtonStyle} />

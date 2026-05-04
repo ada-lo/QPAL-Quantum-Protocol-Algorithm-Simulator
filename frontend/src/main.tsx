@@ -9,7 +9,7 @@ import './styles/globals.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <NeonAuthUIProvider authClient={authClient} redirectTo="/workspace">
+    <NeonAuthUIProvider authClient={authClient} redirectTo="/mode">
       <App />
     </NeonAuthUIProvider>
   </React.StrictMode>

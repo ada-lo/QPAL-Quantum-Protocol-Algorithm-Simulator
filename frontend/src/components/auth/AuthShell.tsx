@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 
 import { SignOutButton } from "@/components/auth/SignOutButton"
 import { useThemeMode } from "@/hooks/useThemeMode"
+import { AppModeToggle } from "@/components/shared/AppModeToggle"
 
 interface AuthShellProps {
   eyebrow: string
@@ -43,9 +44,10 @@ export function AuthShell({ eyebrow, title, subtitle, panelTitle, panelCopy, chi
         <div style={headerActionsStyle}>
           <ThemeButton label="Dark" active={theme === "dark"} onClick={() => setTheme("dark")} icon={<MoonStar size={14} />} />
           <ThemeButton label="Light" active={theme === "light"} onClick={() => setTheme("light")} icon={<SunMedium size={14} />} />
+          <AppModeToggle />
           <SignedOut>
-            <Link to="/auth/sign-in" style={headerLinkStyle}>
-              Sign in
+            <Link to="/login" style={headerLinkStyle}>
+              Log in
             </Link>
           </SignedOut>
           <SignedIn>

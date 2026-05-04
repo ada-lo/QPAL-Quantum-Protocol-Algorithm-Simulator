@@ -3,7 +3,11 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AccountPage } from "@/components/auth/AccountPage"
 import { AuthPage } from "@/components/auth/AuthPage"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
+import { AppModePage } from "@/components/guided/AppModePage"
 import { LandingPage } from "@/components/landing/LandingPage"
+import { LearnerHomePage } from "@/components/learning/LearnerHomePage"
+import { ResearcherExplorePage } from "@/components/learning/ResearcherExplorePage"
+import { TopicDetailPage } from "@/components/learning/TopicDetailPage"
 import { WorkspacePage } from "@/components/workspace/WorkspacePage"
 import { WorkspaceDocsPage } from "@/components/workspace/WorkspaceDocsPage"
 
@@ -108,6 +112,8 @@ export default function App() {
       <AppErrorBoundary>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/signup" element={<AuthPage />} />
           <Route path="/auth/*" element={<AuthPage />} />
           <Route
             path="/account/*"
@@ -122,6 +128,47 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <WorkspacePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mode"
+            element={
+              <ProtectedRoute>
+                <AppModePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/app/mode" element={<Navigate to="/mode" replace />} />
+          <Route
+            path="/learn"
+            element={
+              <ProtectedRoute>
+                <LearnerHomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/learn/:topic"
+            element={
+              <ProtectedRoute>
+                <TopicDetailPage mode="learner" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/explore"
+            element={
+              <ProtectedRoute>
+                <ResearcherExplorePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/explore/:topic"
+            element={
+              <ProtectedRoute>
+                <TopicDetailPage mode="researcher" />
               </ProtectedRoute>
             }
           />

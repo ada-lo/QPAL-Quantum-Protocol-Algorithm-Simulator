@@ -63,7 +63,7 @@ export function WorkspaceDocsPage() {
             Light
           </button>
           <SignedOut>
-            <Link to="/auth/sign-in" style={primaryActionStyle}>
+            <Link to="/login" style={primaryActionStyle}>
               Sign in
             </Link>
           </SignedOut>
