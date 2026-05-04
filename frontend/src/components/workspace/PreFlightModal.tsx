@@ -9,9 +9,8 @@ import { useSimStore, type ComputeTarget, type NoiseModel } from "@/store/simSto
 interface PreFlightModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: () => void
-  /** The current editor source code to simulate */
-  source?: string
+  onConfirm: () => boolean | Promise<boolean>
+  loading?: boolean
 }
 
 // ── Noise model options ───────────────────────────────────────────────────────
@@ -39,15 +38,13 @@ function complexityScore(qubits: number, depth: number, gateCount: number): numb
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function PreFlightModal({ open, onOpenChange, onConfirm, source }: PreFlightModalProps) {
+export function PreFlightModal({ open, onOpenChange, onConfirm, loading = false }: PreFlightModalProps) {
   // Store reads
   const noiseModel       = useSimStore((s) => s.noiseModel)
   const computeTarget    = useSimStore((s) => s.computeTarget)
   const systemHardware   = useSimStore((s) => s.systemHardware)
-  const loading          = useSimStore((s) => s.loading)
   const setNoiseModel    = useSimStore((s) => s.setNoiseModel)
   const setComputeTarget = useSimStore((s) => s.setComputeTarget)
-  const runSimulation    = useSimStore((s) => s.runSimulation)
 
   const nQubits   = useCircuitStore((s) => s.nQubits)
   const gates     = useCircuitStore((s) => s.gates)
@@ -73,13 +70,9 @@ export function PreFlightModal({ open, onOpenChange, onConfirm, source }: PreFli
     : "GPU"
 
   async function handleConfirm() {
-    onOpenChange(false)
-    if (source) {
-      // Dual-engine path: fire actual API call via the store
-      await runSimulation(source)
-    } else {
-      // Legacy path: delegate to WorkspacePage's handler
-      onConfirm()
+    const didRun = await onConfirm()
+    if (didRun) {
+      onOpenChange(false)
     }
   }
 

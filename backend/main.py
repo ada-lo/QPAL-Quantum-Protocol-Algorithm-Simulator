@@ -8,16 +8,33 @@ from api.routes.templates import router as templates_router
 
 load_dotenv()
 
+
+def _normalize_origin(origin: str) -> str:
+    origin = origin.strip()
+    if origin.endswith("/") and "://" in origin:
+        return origin.rstrip("/")
+    return origin
+
+
+def _parse_cors_origins(raw_origins: str | None) -> list[str]:
+    configured = raw_origins or "http://localhost:5173,http://127.0.0.1:5173"
+    origins: list[str] = []
+    for origin in configured.split(","):
+        normalized = _normalize_origin(origin)
+        if normalized and normalized not in origins:
+            origins.append(normalized)
+    return origins
+
 app = FastAPI(
     title="QPAL Workspace API",
     description="Backend for the QPAL quantum experimentation workspace — pseudocode parsing, step-by-step simulation, and benchmarking for quantum algorithms and communication protocols.",
     version="0.2.0",
 )
 
-origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+origins = _parse_cors_origins(os.getenv("CORS_ORIGINS"))
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

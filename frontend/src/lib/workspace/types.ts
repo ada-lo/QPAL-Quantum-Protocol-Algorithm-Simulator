@@ -188,3 +188,36 @@ export interface WorkspaceBenchmarkResponse {
   used_gpu: boolean
   reference_note: string
 }
+
+export interface WorkspaceEntanglementMetrics {
+  concurrence: number | null
+  negativity: number | null
+  purity: number
+  is_entangled: boolean | null
+  engine: string
+}
+
+export interface WorkspaceLandscapeData {
+  angles_x: number[]
+  angles_y: number[]
+  energies: number[][]
+  circuit_type: string
+  preset_label: string | null
+  plot_base64: string | null
+}
+
+export interface WorkspaceStimResult {
+  circuit_type: string
+  qubits: number
+  noise_p: number
+  shots: number
+  outcome_counts: Record<string, number>
+  fidelity: number | null
+  engine: string
+}
+
+export interface WorkspaceAnalysisResponse {
+  entanglement: WorkspaceEntanglementMetrics | null
+  landscape: WorkspaceLandscapeData | null
+  stim: WorkspaceStimResult | null
+}

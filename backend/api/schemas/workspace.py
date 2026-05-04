@@ -24,6 +24,7 @@ class WorkspaceSimulateRequest(BaseModel):
     engine: Literal["custom", "openqasm", "qunetsim"] = "custom"
     noise_model: str | None = None
     compute: str | None = None
+    prefer_gpu: bool | None = None
     seed: int | None = None
     # Legacy pseudocode path: structured instructions (used by executor.py & tests)
     instructions: list[WorkspaceInstruction] = Field(default_factory=list)

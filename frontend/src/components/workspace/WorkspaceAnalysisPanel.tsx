@@ -1,38 +1,6 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
-
-interface EntanglementMetrics {
-  concurrence: number | null
-  negativity: number | null
-  purity: number
-  is_entangled: boolean | null
-  engine: string
-}
-
-interface LandscapeData {
-  angles_x: number[]
-  angles_y: number[]
-  energies: number[][]
-  circuit_type: string
-  preset_label: string | null
-  plot_base64: string | null
-}
-
-interface StimResult {
-  circuit_type: string
-  qubits: number
-  noise_p: number
-  shots: number
-  outcome_counts: Record<string, number>
-  fidelity: number | null
-  engine: string
-}
-
-interface AnalysisResponse {
-  entanglement: EntanglementMetrics | null
-  landscape: LandscapeData | null
-  stim: StimResult | null
-}
+import { runWorkspaceAnalysis } from '@/lib/workspace/api'
+import type { WorkspaceAnalysisResponse } from '@/lib/workspace/types'
 
 interface PresetGate {
   gateId: string
@@ -55,7 +23,7 @@ export default function WorkspaceAnalysisPanel({
   const hasPreset = presetGates !== null && presetGates.length > 0
 
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<AnalysisResponse | null>(null)
+  const [result, setResult] = useState<WorkspaceAnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Settings
@@ -94,8 +62,8 @@ export default function WorkspaceAnalysisPanel({
         payload.preset_label = presetLabel
       }
 
-      const res = await axios.post<AnalysisResponse>('/api/workspace/analyze', payload)
-      setResult(res.data)
+      const res = await runWorkspaceAnalysis(payload)
+      setResult(res)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Analysis failed')
     } finally {

@@ -57,6 +57,7 @@ export interface SimState {
   setStreamStep: (s: number) => void
   setEngineUsed: (e: string | null) => void
   setEngine: (e: 'custom' | 'openqasm' | 'qunetsim') => Promise<void>
+  applySimulationResponse: (response: WorkspaceSimulationResponse, engineUsed?: string) => void
   runSimulation: (code: string) => Promise<void>
   setPreflightOpen: (v: boolean) => void
   setNoiseModel: (m: NoiseModel) => void
@@ -120,6 +121,68 @@ export const useSimStore = create<SimState>((set, get) => ({
       await get().loadTemplate(activeTemplate)
     }
   },
+  applySimulationResponse: (response, engineUsed) => {
+    const nQubits = response.summary.qubits.length
+    const dim = nQubits > 0 ? (1 << nQubits) : 0
+
+    const snapshots: StepSnapshot[] = response.steps.map((step, idx) => {
+      const flat: number[] = step.state?.statevector || []
+      const sv = new Float64Array(flat)
+      const probs = new Float64Array(dim)
+      for (let i = 0; i < dim; i++) {
+        const re = sv[2 * i] || 0
+        const im = sv[2 * i + 1] || 0
+        probs[i] = re * re + im * im
+      }
+      return {
+        step: idx,
+        gateLabel: step.instruction?.opcode || "UNKNOWN",
+        sv,
+        probs,
+      }
+    })
+
+    const rootFlat = response.statevector
+    const lastSnap = snapshots[snapshots.length - 1]
+    const finalFlat = lastSnap ? Array.from(lastSnap.sv) : rootFlat
+    const stateVector: Complex[] = Array.from({ length: dim }, (_, i) => ({
+      re: finalFlat[2 * i] || 0,
+      im: finalFlat[2 * i + 1] || 0,
+    }))
+
+    const blochVectors = response.bloch_vectors.map((bv) => ({
+      qubit: bv.qubit,
+      x: bv.x,
+      y: bv.y,
+      z: bv.z,
+      purity: bv.purity,
+    }))
+
+    const probabilities = lastSnap
+      ? Array.from(lastSnap.probs)
+      : Array.from({ length: dim }, (_, i) => {
+          const re = finalFlat[2 * i] || 0
+          const im = finalFlat[2 * i + 1] || 0
+          return re * re + im * im
+        })
+
+    set({
+      simulationResponse: response,
+      loading: false,
+      error: null,
+      engineUsed: engineUsed ?? response.engine,
+      result: {
+        stateVector,
+        probabilities,
+        fidelity: 1.0,
+        nQubits,
+        shots: 0,
+        blochVectors,
+        counts: {},
+      },
+      snapshots,
+    })
+  },
 
   runSimulation: async (code) => {
     const { engine, noiseModel, computeTarget } = get()
@@ -129,72 +192,7 @@ export const useSimStore = create<SimState>((set, get) => ({
         noiseModel: noiseModel === 'ideal' ? undefined : noiseModel,
         preferGpu: computeTarget === 'gpu',
       })
-
-      set({ simulationResponse: response, loading: false, error: null })
-
-      // FIX 1: Point to the new 'summary' block instead of 'final_state'
-      // We use a fallback just in case old cached data passes through
-      const summaryData = (response as any).summary || (response as any).final_state || {}
-      const nQubits = summaryData.qubits?.length || 0
-      const dim = nQubits > 0 ? (1 << nQubits) : 0
-
-      // Build snapshots from response steps
-      const rawSteps = (response as any).steps || []
-      const snapshots: StepSnapshot[] = rawSteps.map((step: any, idx: number) => {
-        // FIX 2: Add optional chaining (?.) to state so it never crashes even if a step is missing math
-        const flat: number[] = step.state?.statevector || []
-        const sv = new Float64Array(flat)
-        const probs = new Float64Array(dim)
-        for (let i = 0; i < dim; i++) {
-          const re = sv[2 * i] || 0
-          const im = sv[2 * i + 1] || 0
-          probs[i] = re * re + im * im
-        }
-        return {
-          step: idx,
-          gateLabel: step.instruction?.opcode || "UNKNOWN",
-          sv,
-          probs,
-        }
-      })
-
-      // Build result from last step's statevector
-      const lastSnap = snapshots[snapshots.length - 1]
-      const stateVector: Complex[] = lastSnap ? Array.from({ length: dim }, (_, i) => ({
-        re: lastSnap.sv[2 * i] || 0,
-        im: lastSnap.sv[2 * i + 1] || 0,
-      })) : Array.from({ length: dim }, () => ({ re: 0, im: 0 }))
-
-      // Bloch vectors from root-level response (new schema)
-      const blochVecs = (response as any).bloch_vectors || []
-      const blochVectors = blochVecs.map((bv: any) => ({
-        qubit: bv.qubit,
-        x: bv.x,
-        y: bv.y,
-        z: bv.z,
-        purity: bv.purity,
-      }))
-
-      // Probabilities from last snapshot
-      const probabilities = lastSnap ? lastSnap.probs : new Float64Array(dim)
-
-      // DEBUG: Add aggressive logging to diagnose blank UI
-      console.log("[SIM_DEBUG] Raw Response:", response)
-      console.log("[SIM_DEBUG] Calculated Snapshots:", snapshots)
-      console.log("[SIM_DEBUG] Final Result Object:", { stateVector, probabilities, blochVectors })
-
-      set({
-        result: {
-          stateVector,
-          probabilities,
-          fidelity: 1.0,
-          nQubits,
-          shots: 0,
-          blochVectors,
-          counts: {},
-        },
-        snapshots,
-      })
+      get().applySimulationResponse(response, response.engine || engine)
     } catch (err) {
       console.error("[SIM_ERROR] API Request Failed:", err);
       set({ error: err instanceof Error ? err.message : 'Simulation failed.', loading: false })

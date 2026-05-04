@@ -45,12 +45,14 @@ def test_workspace_bell_style_flow():
     )
 
     result = simulate_workspace(req)
+    final_state = result.steps[-1].state
 
     assert result.summary.qubits == ["q0", "q1"]
     assert result.summary.measurements == 1
     assert len(result.steps) == 5
-    assert result.measurement_results[0].qubit == "q0"
-    assert result.final_state.qubits[0].last_operation in {"MEASURE[Z]", "COLLAPSE[Z]"}
+    assert final_state is not None
+    assert final_state.measurements[0].qubit == "q0"
+    assert final_state.qubits[0].last_operation in {"MEASURE[Z]", "COLLAPSE[Z]"}
 
 
 def test_workspace_transport_and_intercept():
@@ -68,11 +70,13 @@ def test_workspace_transport_and_intercept():
     )
 
     result = simulate_workspace(req)
+    final_state = result.steps[-1].state
 
-    assert result.final_state.qubits[0].owner == "Eve"
-    assert result.final_state.qubits[0].intercepted_by == "Eve"
-    assert len(result.final_state.transmissions) == 2
-    assert result.final_state.transmissions[-1].status == "intercepted"
+    assert final_state is not None
+    assert final_state.qubits[0].owner == "Eve"
+    assert final_state.qubits[0].intercepted_by == "Eve"
+    assert len(final_state.transmissions) == 2
+    assert final_state.transmissions[-1].status == "intercepted"
 
 
 def test_bloch_bell_state_entangled():
@@ -87,7 +91,9 @@ def test_bloch_bell_state_entangled():
         ],
     )
     result = simulate_workspace(req)
-    bloch = {v.qubit: v for v in result.final_state.bloch_vectors}
+    final_state = result.steps[-1].state
+    assert final_state is not None
+    bloch = {v.qubit: v for v in final_state.bloch_vectors}
     # Both qubits should have purity ≈ 0 (maximally mixed reduced state)
     for qid in ("q0", "q1"):
         assert abs(bloch[qid].x) < 0.05, f"{qid} x should be ~0"
@@ -105,7 +111,9 @@ def test_bloch_pure_zero():
         ],
     )
     result = simulate_workspace(req)
-    v = result.final_state.bloch_vectors[0]
+    final_state = result.steps[-1].state
+    assert final_state is not None
+    v = final_state.bloch_vectors[0]
     assert abs(v.x) < 0.01
     assert abs(v.y) < 0.01
     assert abs(v.z - 1.0) < 0.01
@@ -122,7 +130,9 @@ def test_bloch_plus_state():
         ],
     )
     result = simulate_workspace(req)
-    v = result.final_state.bloch_vectors[0]
+    final_state = result.steps[-1].state
+    assert final_state is not None
+    v = final_state.bloch_vectors[0]
     assert abs(v.x - 1.0) < 0.01
     assert abs(v.y) < 0.01
     assert abs(v.z) < 0.01
@@ -140,7 +150,9 @@ def test_bloch_post_measurement_pure():
         ],
     )
     result = simulate_workspace(req)
-    v = result.final_state.bloch_vectors[0]
+    final_state = result.steps[-1].state
+    assert final_state is not None
+    v = final_state.bloch_vectors[0]
     # After measurement, purity should be ~1 (pure state)
     assert abs(v.purity - 1.0) < 0.01
     # z should be either +1 or -1
@@ -161,8 +173,10 @@ def test_x_basis_measurement_collapses_correctly():
         ],
     )
     result = simulate_workspace(req)
-    v = result.final_state.bloch_vectors[0]
-    meas = result.measurement_results[0]
+    final_state = result.steps[-1].state
+    assert final_state is not None
+    v = final_state.bloch_vectors[0]
+    meas = final_state.measurements[0]
     # Outcome recorded correctly
     assert meas.basis == "X"
     assert meas.value in (0, 1)
@@ -187,7 +201,9 @@ def test_intercept_syncs_statevector():
         ],
     )
     result = simulate_workspace(req)
-    v = result.final_state.bloch_vectors[0]
+    final_state = result.steps[-1].state
+    assert final_state is not None
+    v = final_state.bloch_vectors[0]
     # After interception of |+⟩ state, qubit should collapse to |0⟩ or |1⟩ in Z-basis
     assert abs(v.purity - 1.0) < 0.01, f"Expected pure state after intercept, got purity={v.purity}"
     assert abs(abs(v.z) - 1.0) < 0.01, f"Expected z=±1 (Z eigenstate), got z={v.z}"
@@ -312,7 +328,7 @@ def test_openqasm_execution_and_schema(client):
     """Send a simple 1-qubit OpenQASM circuit and assert:
 
     - 200 OK
-    - Response matches Universal JSON schema (has steps list, final_state dict)
+    - Response matches the current simulation schema (steps + root statevector/bloch vectors)
     - Steps array contains at least the H gate
     """
     payload = {
@@ -326,8 +342,9 @@ def test_openqasm_execution_and_schema(client):
     # Universal schema checks
     assert "summary" in data and isinstance(data["summary"], dict)
     assert "steps" in data and isinstance(data["steps"], list)
-    assert "final_state" in data and isinstance(data["final_state"], dict)
-    assert "measurement_results" in data and isinstance(data["measurement_results"], list)
+    assert data["kind"] == "algorithm"
+    assert "statevector" in data and isinstance(data["statevector"], list)
+    assert "bloch_vectors" in data and isinstance(data["bloch_vectors"], list)
     assert "warnings" in data and isinstance(data["warnings"], list)
 
     # At least one step, instruction opcode includes H
@@ -339,8 +356,7 @@ def test_openqasm_execution_and_schema(client):
 def test_qunetsim_engine_routing(client):
     """Ensure qunetsim engine routing does not raise a 500 error.
 
-    The qunetsim engine is optional; if QuNetSim is not installed it should
-    still return a valid WorkspaceSimulateResponse with warnings, not crash.
+    The qunetsim engine is intentionally disabled until it runs in a real sandbox.
     """
     payload = {
         "code": "print('no QuNetSim')",
@@ -352,5 +368,8 @@ def test_qunetsim_engine_routing(client):
     data = response.json()
     # Must have the universal fields present
     assert "summary" in data and isinstance(data["summary"], dict)
-    assert "final_state" in data and isinstance(data["final_state"], dict)
+    assert data["kind"] == "algorithm"
+    assert "statevector" in data and isinstance(data["statevector"], list)
+    assert "bloch_vectors" in data and isinstance(data["bloch_vectors"], list)
+    assert any("disabled" in warning.lower() for warning in data["warnings"])
 

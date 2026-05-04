@@ -14,9 +14,11 @@ function useDebounce(fn: () => void, delay: number) {
 
 export function useLocalSim() {
   const { nQubits, gates, initialStates } = useCircuitStore()
-  const { setResult, setEngineUsed, setSnapshots } = useSimStore() as any
+  const { engine, engineUsed, setResult, setEngineUsed, setSnapshots } = useSimStore() as any
 
   const run = () => {
+    if (engine !== "custom") return
+
     if (gates.length === 0) {
       // Reset to initial state display
       setSnapshots?.([])
@@ -54,7 +56,13 @@ export function useLocalSim() {
 
   useEffect(() => {
     debouncedRun()
-  }, [nQubits, JSON.stringify(gates), JSON.stringify(initialStates)])
+  }, [engine, nQubits, JSON.stringify(gates), JSON.stringify(initialStates)])
+
+  useEffect(() => {
+    if (engine !== "custom" && engineUsed === "local-wasm") {
+      setEngineUsed?.(null)
+    }
+  }, [engine, engineUsed, setEngineUsed])
 
   return { run }
 }

@@ -1,4 +1,5 @@
 import type {
+  WorkspaceAnalysisResponse,
   WorkspaceBenchmarkResponse,
   WorkspaceCatalogResponse,
   WorkspaceSimulationResponse,
@@ -81,7 +82,7 @@ export function simulateWorkspaceProgram(
       code,
       engine,
       ...(opts?.noiseModel   ? { noise_model: opts.noiseModel }   : {}),
-      ...(opts?.preferGpu    ? { prefer_gpu: opts.preferGpu }      : {}),
+      ...(opts?.preferGpu !== undefined ? { compute: opts.preferGpu ? "gpu" : "cpu" } : {}),
     }),
   })
 }
@@ -94,5 +95,12 @@ export function runWorkspaceBenchmarks(benchmarkIds?: string[]) {
       repetitions: 1,
       prefer_gpu: true,
     }),
+  })
+}
+
+export function runWorkspaceAnalysis(payload: Record<string, unknown>) {
+  return request<WorkspaceAnalysisResponse>("/api/workspace/analyze", {
+    method: "POST",
+    body: JSON.stringify(payload),
   })
 }

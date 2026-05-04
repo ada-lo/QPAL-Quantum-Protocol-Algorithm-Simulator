@@ -12,7 +12,7 @@ import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
 import { useThemeMode } from "@/hooks/useThemeMode"
 import { LEARNING_EXPERIENCES, type LearningExperience } from "@/lib/quantum/learningCatalog"
 import { PRESETS, type CircuitPreset } from "@/lib/quantum/presets"
-import { fetchWorkspaceCatalog, runWorkspaceBenchmarks, simulateWorkspaceProgram } from "@/lib/workspace/api"
+import { fetchPublicWorkspaceCatalog, runWorkspaceBenchmarks, simulateWorkspaceProgram } from "@/lib/workspace/api"
 import { circuitSnapshotToProgram } from "@/lib/workspace/circuitToProgram"
 import { parsePseudoProgram } from "@/lib/workspace/pseudoParser"
 import { programToCircuit } from "@/lib/workspace/programToCircuit"
@@ -277,6 +277,7 @@ export function WorkspacePage() {
   const setWalkthroughStep = useSimStore((s) => s.setWalkthroughStep)
   const openForWalkthrough = useSimStore((s) => s.openForWalkthrough)
   const setOpenForWalkthrough = useSimStore((s) => s.setOpenForWalkthrough)
+  const applySimulationResponse = useSimStore((s) => s.applySimulationResponse)
   const loadTemplate = useSimStore((s) => s.loadTemplate)
   const engine = useSimStore((s) => s.engine)
   const setEngine = useSimStore((s) => s.setEngine)
@@ -351,7 +352,7 @@ export function WorkspacePage() {
   }, [source, engine])
   const canSyncCircuit = engine === "custom" && parsed.errors.length === 0 && parsed.instructions.length > 0
   const selectedStep = simulation?.steps[Math.min(activeStep, Math.max(simulation.steps.length - 1, 0))] ?? null
-  const selectedState = selectedStep?.state ?? simulation?.final_state ?? null
+  const selectedState = selectedStep?.state ?? null
   const inspectorContext = selectedModel
     ? { title: selectedModel.title, description: selectedModel.description, kind: selectedModel.kindLabel }
     : null
@@ -361,7 +362,7 @@ export function WorkspacePage() {
 
     async function loadCatalog() {
       try {
-        const response = await fetchWorkspaceCatalog()
+        const response = await fetchPublicWorkspaceCatalog()
         if (!active) return
         setCatalog(response)
         setCatalogError(null)
@@ -461,6 +462,7 @@ export function WorkspacePage() {
       })
       if (executionToken !== executionTokenRef.current) return
       setSimulation(response)
+      applySimulationResponse(response, response.engine || engine)
       setRuntimeError(null)
       setActiveStep(Math.max(response.steps.length - 1, 0))
 
@@ -474,11 +476,14 @@ export function WorkspacePage() {
       if (executionToken !== executionTokenRef.current) return
       setSimulation(null)
       setRuntimeError(error instanceof Error ? error.message : "Program execution failed.")
+      return false
     } finally {
       if (executionToken === executionTokenRef.current) {
         setRunning(false)
       }
     }
+
+    return true
   }
 
   async function handleRunWorkspace() {
@@ -488,13 +493,13 @@ export function WorkspacePage() {
 
     if (!source.trim()) {
       setRuntimeError("Code cannot be empty.")
-      return
+      return false
     }
 
     // Guard: Block execution if frontend parser found syntax errors
     if (parsed.errors.length > 0) {
       setRuntimeError("Please fix syntax errors before running.")
-      return
+      return false
     }
 
     const { templateParams } = useSimStore.getState()
@@ -503,10 +508,10 @@ export function WorkspacePage() {
     if (hasEmptyParams || source.includes("{{")) {
       setValidationFailed(true)
       setRuntimeError("Error: Please provide valid inputs for all template parameters.")
-      return
+      return false
     }
 
-    await executeProgram(source)
+    return await executeProgram(source)
   }
 
   async function handleRunBenchmarks() {
@@ -856,8 +861,8 @@ export function WorkspacePage() {
           setPreflightOpen(open)
           if (!open) setOpenForWalkthrough(false) // clear flag if user cancels
         }}
-        onConfirm={() => void handleRunWorkspace()}
-        source={source}
+        onConfirm={handleRunWorkspace}
+        loading={running}
       />
 
       {/* ── Step-by-Step Debugger modal ── */}
