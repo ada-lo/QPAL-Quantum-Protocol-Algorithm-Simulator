@@ -7,6 +7,24 @@ export interface TopicStep {
   description: string
 }
 
+export interface TopicInputOption {
+  label: string
+  value: string
+}
+
+export interface TopicInputConfig {
+  id: string
+  label: string
+  type: "dropdown" | "text" | "number"
+  defaultValue: string | number
+  options?: TopicInputOption[]
+  placeholder?: string
+  min?: number
+  max?: number
+  maxLength?: number
+  validation?: "binary"
+}
+
 export interface TopicCatalogEntry {
   id: string
   name: string
@@ -17,6 +35,8 @@ export interface TopicCatalogEntry {
   catalog_key: string
   steps: TopicStep[]
   prerequisites: string[]
+  inputs?: TopicInputConfig[]
+  templates?: Record<string, string>
 }
 
 export interface TopicTrack {
@@ -93,4 +113,8 @@ export function getTopicById(id: string) {
 
 export function getTopicLabel(id: string) {
   return topicById.get(id)?.name ?? id
+}
+
+export function isProtocolTopic(id: string) {
+  return PROTOCOL_TOPIC_IDS.includes(id)
 }

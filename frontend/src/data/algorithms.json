@@ -264,6 +264,24 @@
     "fallback_description": "Deutsch's algorithm distinguishes constant and balanced single-bit Boolean oracles with one quantum query by combining phase kickback with interference.",
     "complexity": "O(1) oracle query",
     "catalog_key": "deutsch",
+    "inputs": [
+      {
+        "id": "fx",
+        "label": "f(x)",
+        "type": "dropdown",
+        "defaultValue": "balanced",
+        "options": [
+          { "label": "constant-0", "value": "constant-0" },
+          { "label": "constant-1", "value": "constant-1" },
+          { "label": "balanced", "value": "balanced" }
+        ]
+      }
+    ],
+    "templates": {
+      "constant-0": "NOTE Deutsch Algorithm - constant-0 oracle\n\nINIT q0\nINIT q1 1\nH q0\nH q1\n\nLABEL Oracle: f(x)=0\nNOTE No oracle action needed\n\nLABEL Final interference\nH q0\nMEASURE q0 BASIS Z",
+      "constant-1": "NOTE Deutsch Algorithm - constant-1 oracle\n\nINIT q0\nINIT q1 1\nH q0\nH q1\n\nLABEL Oracle: f(x)=1\nX q1\n\nLABEL Final interference\nH q0\nMEASURE q0 BASIS Z",
+      "balanced": "NOTE Deutsch Algorithm - balanced oracle\n\nINIT q0\nINIT q1 1\nH q0\nH q1\n\nLABEL Oracle: f(x)=x\nCNOT q0 q1\n\nLABEL Final interference\nH q0\nMEASURE q0 BASIS Z"
+    },
     "steps": [
       { "title": "Prepare the input and ancilla", "description": "Start with one query qubit and one helper qubit, then apply Hadamard gates so the circuit can evaluate both possible inputs coherently." },
       { "title": "Call the oracle once", "description": "The oracle acts on the superposed input and writes information about the hidden function into the phase of the state." },
@@ -280,6 +298,37 @@
     "fallback_description": "Deutsch-Jozsa generalizes the Deutsch setting to n-bit oracles, deciding whether a promised function is constant or balanced with a single coherent query.",
     "complexity": "O(1) oracle query under the promise",
     "catalog_key": "deutsch_jozsa",
+    "inputs": [
+      {
+        "id": "qubits",
+        "label": "Input qubits",
+        "type": "dropdown",
+        "defaultValue": "3",
+        "options": [
+          { "label": "2", "value": "2" },
+          { "label": "3", "value": "3" },
+          { "label": "4", "value": "4" }
+        ]
+      },
+      {
+        "id": "fx",
+        "label": "f(x)",
+        "type": "dropdown",
+        "defaultValue": "balanced",
+        "options": [
+          { "label": "constant", "value": "constant" },
+          { "label": "balanced", "value": "balanced" }
+        ]
+      }
+    ],
+    "templates": {
+      "2-constant": "NOTE Deutsch-Jozsa - 2 input qubits, constant oracle\n\nINIT q0\nINIT q1\nINIT q2 1\nH q0\nH q1\nH q2\n\nLABEL Oracle: constant\nNOTE No controlled flips\n\nH q0\nH q1\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z",
+      "2-balanced": "NOTE Deutsch-Jozsa - 2 input qubits, balanced oracle\n\nINIT q0\nINIT q1\nINIT q2 1\nH q0\nH q1\nH q2\n\nLABEL Oracle: balanced parity\nCNOT q0 q2\nCNOT q1 q2\n\nH q0\nH q1\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z",
+      "3-constant": "NOTE Deutsch-Jozsa - 3 input qubits, constant oracle\n\nINIT q0\nINIT q1\nINIT q2\nINIT q3 1\nH q0\nH q1\nH q2\nH q3\n\nLABEL Oracle: constant\nNOTE No controlled flips\n\nH q0\nH q1\nH q2\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z\nMEASURE q2 BASIS Z",
+      "3-balanced": "NOTE Deutsch-Jozsa - 3 input qubits, balanced oracle\n\nINIT q0\nINIT q1\nINIT q2\nINIT q3 1\nH q0\nH q1\nH q2\nH q3\n\nLABEL Oracle: balanced parity\nCNOT q0 q3\nCNOT q1 q3\nCNOT q2 q3\n\nH q0\nH q1\nH q2\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z\nMEASURE q2 BASIS Z",
+      "4-constant": "NOTE Deutsch-Jozsa - 4 input qubits, constant oracle\n\nINIT q0\nINIT q1\nINIT q2\nINIT q3\nINIT q4 1\nH q0\nH q1\nH q2\nH q3\nH q4\n\nLABEL Oracle: constant\nNOTE No controlled flips\n\nH q0\nH q1\nH q2\nH q3\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z\nMEASURE q2 BASIS Z\nMEASURE q3 BASIS Z",
+      "4-balanced": "NOTE Deutsch-Jozsa - 4 input qubits, balanced oracle\n\nINIT q0\nINIT q1\nINIT q2\nINIT q3\nINIT q4 1\nH q0\nH q1\nH q2\nH q3\nH q4\n\nLABEL Oracle: balanced parity\nCNOT q0 q4\nCNOT q1 q4\nCNOT q2 q4\nCNOT q3 q4\n\nH q0\nH q1\nH q2\nH q3\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z\nMEASURE q2 BASIS Z\nMEASURE q3 BASIS Z"
+    },
     "steps": [
       { "title": "Create a superposition over inputs", "description": "Apply Hadamard gates to all query qubits so the oracle sees every possible input at once." },
       { "title": "Use an ancilla to capture phase", "description": "The helper qubit is prepared so the oracle's effect is written into phase rather than only into output bits." },
@@ -296,6 +345,31 @@
     "fallback_description": "Bernstein-Vazirani recovers a hidden bit string in one oracle call by encoding the secret into relative phases and decoding it with Hadamard interference.",
     "complexity": "O(1) oracle query",
     "catalog_key": "bernstein_vazirani",
+    "inputs": [
+      {
+        "id": "qubits",
+        "label": "Input qubits",
+        "type": "dropdown",
+        "defaultValue": "3",
+        "options": [
+          { "label": "2", "value": "2" },
+          { "label": "3", "value": "3" },
+          { "label": "4", "value": "4" }
+        ]
+      },
+      {
+        "id": "secret",
+        "label": "Secret string",
+        "type": "text",
+        "defaultValue": "110",
+        "placeholder": "Binary secret",
+        "validation": "binary",
+        "maxLength": 4
+      }
+    ],
+    "templates": {
+      "base": "NOTE Bernstein-Vazirani - secret {{SECRET}}\n\n{{INIT_LINES}}\nINIT q{{QUBITS}} 1\n\n{{H_LINES}}\nH q{{QUBITS}}\n\nLABEL Oracle for secret {{SECRET}}\n{{ORACLE_GATES}}\n\n{{FINAL_H_LINES}}\n\nLABEL Readout reveals the hidden string\n{{MEASURE_LINES}}"
+    },
     "steps": [
       { "title": "Prepare the query register", "description": "All input qubits are placed into superposition so they can probe every relevant bit pattern simultaneously." },
       { "title": "Apply the hidden-string oracle", "description": "The oracle uses phase kickback so the secret string is imprinted into the phase structure of the input register." },
@@ -312,6 +386,22 @@
     "fallback_description": "Simon's algorithm samples linear equations orthogonal to a hidden xor mask and solves them classically, giving an exponential separation over brute-force search.",
     "complexity": "Polynomial-time quantum queries",
     "catalog_key": "simon",
+    "inputs": [
+      {
+        "id": "qubits",
+        "label": "Input qubits",
+        "type": "dropdown",
+        "defaultValue": "2",
+        "options": [
+          { "label": "2", "value": "2" },
+          { "label": "3", "value": "3" }
+        ]
+      }
+    ],
+    "templates": {
+      "2": "NOTE Simon's Algorithm - 2-qubit hidden period example\n\nINIT q0\nINIT q1\nINIT q2\nINIT q3\n\nLABEL Superpose input register\nH q0\nH q1\n\nLABEL Oracle with hidden period s=11\nCNOT q0 q2\nCNOT q1 q3\nCNOT q0 q3\nCNOT q1 q2\n\nMEASURE q2 BASIS Z\nMEASURE q3 BASIS Z\nH q0\nH q1\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z",
+      "3": "NOTE Simon's Algorithm - 3-qubit hidden period example\n\nINIT q0\nINIT q1\nINIT q2\nINIT q3\nINIT q4\nINIT q5\n\nLABEL Superpose input register\nH q0\nH q1\nH q2\n\nLABEL Oracle with hidden period s=101\nCNOT q0 q3\nCNOT q1 q4\nCNOT q2 q5\nCNOT q0 q5\nCNOT q2 q3\n\nMEASURE q3 BASIS Z\nMEASURE q4 BASIS Z\nMEASURE q5 BASIS Z\nH q0\nH q1\nH q2\nMEASURE q0 BASIS Z\nMEASURE q1 BASIS Z\nMEASURE q2 BASIS Z"
+    },
     "steps": [
       { "title": "Superpose all candidate inputs", "description": "The input register is spread over every possible bit string so the oracle can act on them together." },
       { "title": "Query the two-to-one oracle", "description": "The oracle maps paired inputs with the same hidden xor relation to the same output state." },
@@ -328,6 +418,30 @@
     "fallback_description": "Grover's search alternates oracle phase marking with diffusion to amplify a target basis state, reducing unstructured search from linear to square-root query complexity.",
     "complexity": "O(sqrt(N)) queries",
     "catalog_key": "grover_search",
+    "inputs": [
+      {
+        "id": "qubits",
+        "label": "Search qubits",
+        "type": "dropdown",
+        "defaultValue": "2",
+        "options": [
+          { "label": "2", "value": "2" },
+          { "label": "3", "value": "3" }
+        ]
+      },
+      {
+        "id": "target",
+        "label": "Target state",
+        "type": "text",
+        "defaultValue": "11",
+        "placeholder": "Binary target",
+        "validation": "binary",
+        "maxLength": 3
+      }
+    ],
+    "templates": {
+      "base": "NOTE Grover Search - {{QUBITS}} qubits, target {{TARGET}}\n\n{{INIT_LINES}}\n\nLABEL Uniform superposition\n{{H_LINES}}\n\nLABEL Oracle marks {{TARGET}}\n{{ORACLE_GATES}}\n\nLABEL Diffusion operator\n{{DIFFUSION_LINES}}\n\nLABEL Readout\n{{MEASURE_LINES}}"
+    },
     "steps": [
       { "title": "Initialize a uniform search state", "description": "Hadamard gates spread amplitude equally across all candidate answers in the search space." },
       { "title": "Mark the target with the oracle", "description": "The oracle flips the phase of the desired state without directly revealing which one it is." },
@@ -344,6 +458,24 @@
     "fallback_description": "The quantum Fourier transform applies structured phase rotations and swaps to map computational-basis amplitudes into the frequency domain with polylogarithmic depth.",
     "complexity": "O(n^2) gates in the standard circuit",
     "catalog_key": "qft_3qubit",
+    "inputs": [
+      {
+        "id": "qubits",
+        "label": "Register qubits",
+        "type": "dropdown",
+        "defaultValue": "3",
+        "options": [
+          { "label": "2", "value": "2" },
+          { "label": "3", "value": "3" },
+          { "label": "4", "value": "4" }
+        ]
+      }
+    ],
+    "templates": {
+      "2": "NOTE 2-qubit Quantum Fourier Transform\n\nINIT q0 1\nINIT q1\n\nH q0\nCNOT q1 q0\nRZ q0 -1.5708\nCNOT q1 q0\nRZ q0 1.5708\nH q1\nSWAP q0 q1",
+      "3": "NOTE 3-qubit Quantum Fourier Transform\n\nINIT q0 1\nINIT q1\nINIT q2\n\nH q0\nCNOT q1 q0\nRZ q0 -1.5708\nCNOT q1 q0\nRZ q0 1.5708\nCNOT q2 q0\nRZ q0 -0.7854\nCNOT q2 q0\nRZ q0 0.7854\nH q1\nCNOT q2 q1\nRZ q1 -1.5708\nCNOT q2 q1\nRZ q1 1.5708\nH q2\nSWAP q0 q2",
+      "4": "NOTE 4-qubit Quantum Fourier Transform\n\nINIT q0 1\nINIT q1\nINIT q2\nINIT q3\n\nH q0\nCNOT q1 q0\nRZ q0 -1.5708\nCNOT q1 q0\nRZ q0 1.5708\nCNOT q2 q0\nRZ q0 -0.7854\nCNOT q2 q0\nRZ q0 0.7854\nCNOT q3 q0\nRZ q0 -0.3927\nCNOT q3 q0\nRZ q0 0.3927\nH q1\nCNOT q2 q1\nRZ q1 -1.5708\nCNOT q2 q1\nRZ q1 1.5708\nCNOT q3 q1\nRZ q1 -0.7854\nCNOT q3 q1\nRZ q1 0.7854\nH q2\nCNOT q3 q2\nRZ q2 -1.5708\nCNOT q3 q2\nRZ q2 1.5708\nH q3\nSWAP q0 q3\nSWAP q1 q2"
+    },
     "steps": [
       { "title": "Start with an encoded register", "description": "The input register holds amplitudes or phases that represent the signal or computational pattern you want to transform." },
       { "title": "Apply layered Hadamards and controlled phases", "description": "Each qubit receives a Hadamard and conditional phase rotations that accumulate frequency-style information from the lower-order qubits." },
@@ -590,6 +722,19 @@
     "fallback_description": "BB84 is a prepare-and-measure key distribution protocol where basis mismatch statistics reveal eavesdropping through an elevated quantum bit error rate.",
     "complexity": "Linear rounds with basis sifting",
     "catalog_key": "bb84_eavesdrop",
+    "inputs": [
+      {
+        "id": "key_length",
+        "label": "Key length",
+        "type": "number",
+        "defaultValue": 8,
+        "min": 4,
+        "max": 32
+      }
+    ],
+    "templates": {
+      "base": "NOTE BB84 protocol - {{KEY_LENGTH}} rounds\n\nACTOR Alice\nACTOR Bob\nACTOR Eve\n\nLABEL Shared setup\nNOTE Repeat the following workflow for {{KEY_LENGTH}} rounds\n\nLABEL Example round\nINIT q0 +\nASSIGN q0 Alice\nSEND q0 Alice Bob\nINTERCEPT q0 Eve\nSEND q0 Eve Bob\nMEASURE q0 BASIS Z\n\nNOTE Basis comparison and key sifting happen after transmission"
+    },
     "steps": [
       { "title": "Alice prepares random bits and bases", "description": "Each transmitted qubit is encoded using one of two possible bases so an eavesdropper cannot copy it safely." },
       { "title": "Bob measures in random bases", "description": "Bob receives each qubit and chooses his measurement basis independently, which means some rounds will match Alice and some will not." },

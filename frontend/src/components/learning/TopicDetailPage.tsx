@@ -5,12 +5,133 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom"
 import { AppTopNav } from "@/components/shared/AppTopNav"
 import { fetchArxivPapers, fetchWikipediaSummary, type ArxivPaper, type WikipediaSummary } from "@/lib/api/externalApis"
 import { setStoredAppMode } from "@/lib/appMode"
-import { getTopicById, getTopicLabel } from "@/lib/learning/topicCatalog"
+import { getTopicById, getTopicLabel, type TopicCatalogEntry, type TopicInputConfig } from "@/lib/learning/topicCatalog"
 import { fetchPublicWorkspaceCatalog } from "@/lib/workspace/api"
 import type { WorkspaceTemplate } from "@/lib/workspace/types"
 
 interface TopicDetailPageProps {
   mode: "learner" | "researcher"
+}
+
+type TopicInputValue = string | number
+
+function buildInitialInputValues(topic: TopicCatalogEntry | null) {
+  return Object.fromEntries((topic?.inputs ?? []).map((input) => [input.id, input.defaultValue])) as Record<string, TopicInputValue>
+}
+
+function replaceToken(source: string, token: string, value: string) {
+  return source.split(token).join(value)
+}
+
+function buildVariantKey(topic: TopicCatalogEntry, values: Record<string, TopicInputValue>) {
+  if (!topic.inputs || topic.inputs.length === 0) return "base"
+  return topic.inputs
+    .filter((input) => input.type === "dropdown")
+    .map((input) => String(values[input.id] ?? input.defaultValue))
+    .join("-")
+}
+
+function validateInput(input: TopicInputConfig, rawValue: TopicInputValue, allValues: Record<string, TopicInputValue>) {
+  const value = String(rawValue ?? "")
+
+  if (input.type === "text" && input.validation === "binary" && /[^01]/.test(value)) {
+    return "Only 0 and 1 are allowed."
+  }
+
+  if (input.type === "text" && input.validation === "binary") {
+    const qubitValue = Number(allValues.qubits ?? 0)
+    if (qubitValue > 0 && value.length !== qubitValue) {
+      return `Enter exactly ${qubitValue} bits.`
+    }
+  }
+
+  if (input.type === "number") {
+    const numericValue = Number(rawValue)
+    if (Number.isNaN(numericValue)) return "Enter a valid number."
+    if (input.min !== undefined && numericValue < input.min) return `Minimum value is ${input.min}.`
+    if (input.max !== undefined && numericValue > input.max) return `Maximum value is ${input.max}.`
+  }
+
+  return null
+}
+
+function buildBernsteinVaziraniCode(secret: string, qubits: number, template: string) {
+  const initLines = Array.from({ length: qubits }, (_, index) => `INIT q${index}`).join("\n")
+  const hLines = Array.from({ length: qubits }, (_, index) => `H q${index}`).join("\n")
+  const oracleGates = secret
+    .split("")
+    .map((bit, index) => (bit === "1" ? `CNOT q${index} q${qubits}` : ""))
+    .filter(Boolean)
+    .join("\n") || "NOTE Secret string is all zeros"
+  const measureLines = Array.from({ length: qubits }, (_, index) => `MEASURE q${index} BASIS Z`).join("\n")
+
+  let next = template
+  next = replaceToken(next, "{{SECRET}}", secret)
+  next = replaceToken(next, "{{QUBITS}}", String(qubits))
+  next = replaceToken(next, "{{INIT_LINES}}", initLines)
+  next = replaceToken(next, "{{H_LINES}}", hLines)
+  next = replaceToken(next, "{{FINAL_H_LINES}}", hLines)
+  next = replaceToken(next, "{{ORACLE_GATES}}", oracleGates)
+  next = replaceToken(next, "{{MEASURE_LINES}}", measureLines)
+  return next
+}
+
+function buildGroverCode(target: string, qubits: number, template: string) {
+  const initLines = Array.from({ length: qubits }, (_, index) => `INIT q${index}`).join("\n")
+  const hLines = Array.from({ length: qubits }, (_, index) => `H q${index}`).join("\n")
+  const measureLines = Array.from({ length: qubits }, (_, index) => `MEASURE q${index} BASIS Z`).join("\n")
+  const xPrep = target
+    .split("")
+    .map((bit, index) => (bit === "0" ? `X q${index}` : ""))
+    .filter(Boolean)
+    .join("\n")
+  const xUnprep = xPrep
+  const oracleGates =
+    qubits === 2
+      ? [xPrep, "CZ q0 q1", xUnprep].filter(Boolean).join("\n")
+      : [xPrep, "H q2", "TOFFOLI q0 q2 q1", "H q2", xUnprep].filter(Boolean).join("\n")
+  const diffuserSteps = [
+    hLines,
+    Array.from({ length: qubits }, (_, index) => `X q${index}`).join("\n"),
+    qubits === 2 ? "CZ q0 q1" : "H q2\nTOFFOLI q0 q2 q1\nH q2",
+    Array.from({ length: qubits }, (_, index) => `X q${index}`).join("\n"),
+    hLines,
+  ].join("\n")
+
+  let next = template
+  next = replaceToken(next, "{{TARGET}}", target)
+  next = replaceToken(next, "{{QUBITS}}", String(qubits))
+  next = replaceToken(next, "{{INIT_LINES}}", initLines)
+  next = replaceToken(next, "{{H_LINES}}", hLines)
+  next = replaceToken(next, "{{ORACLE_GATES}}", oracleGates)
+  next = replaceToken(next, "{{DIFFUSION_LINES}}", diffuserSteps)
+  next = replaceToken(next, "{{MEASURE_LINES}}", measureLines)
+  return next
+}
+
+function buildPreviewCode(topic: TopicCatalogEntry, values: Record<string, TopicInputValue>, catalogTemplate: WorkspaceTemplate | null) {
+  if (!topic.templates || Object.keys(topic.templates).length === 0) {
+    return catalogTemplate?.code ?? ""
+  }
+
+  if (topic.id === "bernstein-vazirani") {
+    const qubits = Number(values.qubits)
+    const secret = String(values.secret)
+    return buildBernsteinVaziraniCode(secret, qubits, topic.templates.base ?? catalogTemplate?.code ?? "")
+  }
+
+  if (topic.id === "grovers-search") {
+    const qubits = Number(values.qubits)
+    const target = String(values.target)
+    return buildGroverCode(target, qubits, topic.templates.base ?? catalogTemplate?.code ?? "")
+  }
+
+  if (topic.id === "bb84") {
+    return replaceToken(topic.templates.base ?? catalogTemplate?.code ?? "", "{{KEY_LENGTH}}", String(values.key_length))
+  }
+
+  const variantKey = buildVariantKey(topic, values)
+  return topic.templates[variantKey] ?? topic.templates.base ?? catalogTemplate?.code ?? ""
 }
 
 export function TopicDetailPage({ mode }: TopicDetailPageProps) {
@@ -22,13 +143,19 @@ export function TopicDetailPage({ mode }: TopicDetailPageProps) {
   const [paperError, setPaperError] = useState<string | null>(null)
   const [paperLoading, setPaperLoading] = useState(false)
   const [showAllPapers, setShowAllPapers] = useState(false)
-  const [template, setTemplate] = useState<WorkspaceTemplate | null>(null)
+  const [catalogTemplate, setCatalogTemplate] = useState<WorkspaceTemplate | null>(null)
   const [templateLoading, setTemplateLoading] = useState(false)
   const [templateError, setTemplateError] = useState<string | null>(null)
+  const [inputValues, setInputValues] = useState<Record<string, TopicInputValue>>({})
+  const [previewFlash, setPreviewFlash] = useState(false)
 
   useEffect(() => {
     setStoredAppMode(mode)
   }, [mode])
+
+  useEffect(() => {
+    setInputValues(buildInitialInputValues(topic))
+  }, [topic])
 
   useEffect(() => {
     if (!topic) return
@@ -57,7 +184,7 @@ export function TopicDetailPage({ mode }: TopicDetailPageProps) {
         const catalog = await fetchPublicWorkspaceCatalog()
         if (!active) return
         const nextTemplate = catalog.templates.find((item) => item.id === topic.catalog_key) ?? null
-        setTemplate(nextTemplate)
+        setCatalogTemplate(nextTemplate)
         if (!nextTemplate) {
           setTemplateError("No workspace template preview was found for this topic.")
         }
@@ -106,13 +233,39 @@ export function TopicDetailPage({ mode }: TopicDetailPageProps) {
   const workspaceButtonLabel = mode === "learner" ? "Load Circuit" : "Load in Workspace"
   const technicalSummary = useMemo(() => topic?.fallback_description ?? "", [topic])
   const visiblePapers = showAllPapers ? papers : papers.slice(0, 3)
+  const inputErrors = useMemo(() => {
+    if (!topic?.inputs) return {}
+    return Object.fromEntries(
+      topic.inputs.map((input) => [input.id, validateInput(input, inputValues[input.id] ?? input.defaultValue, inputValues)]),
+    ) as Record<string, string | null>
+  }, [inputValues, topic])
+  const hasInputErrors = Object.values(inputErrors).some(Boolean)
+  const previewCode = useMemo(() => {
+    if (!topic) return ""
+    return buildPreviewCode(topic, inputValues, catalogTemplate)
+  }, [catalogTemplate, inputValues, topic])
+
+  useEffect(() => {
+    if (mode !== "learner" || !previewCode) return
+    setPreviewFlash(true)
+    const timeout = window.setTimeout(() => setPreviewFlash(false), 280)
+    return () => window.clearTimeout(timeout)
+  }, [mode, previewCode])
 
   if (!topic) {
     return <Navigate to={backPath} replace />
   }
 
   function handleLoadCircuit() {
-    navigate(`/workspace?template=${encodeURIComponent(topic.catalog_key)}`)
+    if (!topic.templates && mode === "learner") {
+      navigate(`/workspace?template=${encodeURIComponent(topic.catalog_key)}`)
+      return
+    }
+    navigate("/workspace", { state: { circuit: previewCode || catalogTemplate?.code || "", format: "custom" } })
+  }
+
+  function handleInputChange(input: TopicInputConfig, value: TopicInputValue) {
+    setInputValues((current) => ({ ...current, [input.id]: value }))
   }
 
   return (
@@ -207,13 +360,76 @@ export function TopicDetailPage({ mode }: TopicDetailPageProps) {
                   <div style={codeSkeletonLineShortStyle} />
                   <div style={codeSkeletonLineMidStyle} />
                 </div>
-              ) : template ? (
-                <pre style={codeBlockStyle}>{template.code}</pre>
+              ) : previewCode ? (
+                <pre
+                  style={{
+                    ...codeBlockStyle,
+                    boxShadow: previewFlash ? "0 0 0 1px var(--accent-cyan), 0 0 28px rgba(99, 178, 159, 0.18)" : "none",
+                    borderColor: previewFlash ? "var(--accent-cyan)" : "var(--border)",
+                  }}
+                >
+                  {previewCode}
+                </pre>
               ) : (
                 <div style={noticeStyle}>{templateError ?? "Unable to load circuit preview."}</div>
               )}
-              {!templateLoading && templateError && !template && <div style={mutedTextStyle}>{templateError}</div>}
-              <button type="button" onClick={handleLoadCircuit} style={actionButtonStyle}>
+              {!templateLoading && templateError && !catalogTemplate && <div style={mutedTextStyle}>{templateError}</div>}
+              {(topic.inputs?.length ?? 0) > 0 && (
+                <div style={configShellStyle}>
+                  <div style={eyebrowStyle}>CONFIGURE CIRCUIT</div>
+                  <div style={configGridStyle}>
+                    {topic.inputs?.map((input) => (
+                      <label key={input.id} style={inputFieldShellStyle}>
+                        <span style={inputLabelStyle}>{input.label}</span>
+                        {input.type === "dropdown" && (
+                          <select
+                            value={String(inputValues[input.id] ?? input.defaultValue)}
+                            onChange={(event) => handleInputChange(input, event.target.value)}
+                            style={inputControlStyle}
+                          >
+                            {input.options?.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {input.type === "text" && (
+                          <input
+                            type="text"
+                            value={String(inputValues[input.id] ?? input.defaultValue)}
+                            onChange={(event) => handleInputChange(input, event.target.value)}
+                            placeholder={input.placeholder}
+                            maxLength={input.maxLength}
+                            style={inputControlStyle}
+                          />
+                        )}
+                        {input.type === "number" && (
+                          <input
+                            type="number"
+                            value={Number(inputValues[input.id] ?? input.defaultValue)}
+                            onChange={(event) => handleInputChange(input, event.target.value)}
+                            min={input.min}
+                            max={input.max}
+                            style={inputControlStyle}
+                          />
+                        )}
+                        {inputErrors[input.id] && <span style={inputErrorStyle}>{inputErrors[input.id]}</span>}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleLoadCircuit}
+                disabled={hasInputErrors}
+                style={{
+                  ...actionButtonStyle,
+                  opacity: hasInputErrors ? 0.55 : 1,
+                  cursor: hasInputErrors ? "not-allowed" : "pointer",
+                }}
+              >
                 {workspaceButtonLabel}
               </button>
             </section>
@@ -474,6 +690,7 @@ const codeBlockStyle: CSSProperties = {
   fontSize: 12,
   lineHeight: 1.65,
   minHeight: 220,
+  transition: "box-shadow var(--transition), border-color var(--transition)",
 }
 
 const codeSkeletonShellStyle: CSSProperties = {
@@ -528,6 +745,45 @@ const deeperLinkCardStyle: CSSProperties = {
 const deeperLinkTitleStyle: CSSProperties = {
   fontSize: 18,
   color: "var(--text-primary)",
+}
+
+const configShellStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+}
+
+const configGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+}
+
+const inputFieldShellStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+}
+
+const inputLabelStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 700,
+  color: "var(--text-primary)",
+}
+
+const inputControlStyle: CSSProperties = {
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  color: "var(--text-primary)",
+  padding: "12px 14px",
+  boxShadow: "var(--shadow-card)",
+}
+
+const inputErrorStyle: CSSProperties = {
+  color: "var(--accent-red)",
+  fontSize: 12,
+  lineHeight: 1.5,
 }
 
 const paperGridStyle: CSSProperties = {

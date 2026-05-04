@@ -1,13 +1,10 @@
-import * as Accordion from "@radix-ui/react-accordion"
 import * as Dialog from "@radix-ui/react-dialog"
-import * as Tooltip from "@radix-ui/react-tooltip"
 import { UserButton } from "@neondatabase/neon-js/auth/react/ui"
-import { BookOpenText, ChevronDown, CircleHelp, Cpu, House, Info, Menu, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
+import { BookOpenText, Cpu, House, Info, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { Editor } from "@monaco-editor/react"
 
-import { SignOutButton } from "@/components/auth/SignOutButton"
 import { LearningStudioPanel } from "@/components/learning/LearningStudioPanel"
 import { AppModeToggle } from "@/components/shared/AppModeToggle"
 import { useThemeMode } from "@/hooks/useThemeMode"
@@ -31,12 +28,11 @@ import type { CircuitGate } from "@/store/circuitStore"
 import { useCircuitStore } from "@/store/circuitStore"
 import { useLearningStore } from "@/store/learningStore"
 import { useSimStore } from "@/store/simStore"
-import { AlgorithmSettingsPanel, BlochInspector, DocsPanel, StateInspector } from "./WorkspaceInspectors"
+import { AlgorithmSettingsPanel, BlochInspector, StateInspector } from "./WorkspaceInspectors"
 import WorkspaceAnalysisPanel from "./WorkspaceAnalysisPanel"
 import { WorkspaceCircuitBuilder } from "./WorkspaceCircuitBuilder"
 import { PreFlightModal } from "./PreFlightModal"
 import { StepWalkthroughModal } from "./StepWalkthroughModal"
-import { DocumentationModal } from "./DocumentationModal"
 
 const DEFAULT_PROGRAM = `LABEL Bell Pair
 INIT q0
@@ -52,7 +48,6 @@ const INSPECTOR_TABS = [
   { id: "state", label: "State" },
   { id: "bloch", label: "Bloch" },
   { id: "analysis", label: "Analysis" },
-  { id: "docs", label: "Docs" },
 ] as const
 const STUDIO_ALIASES: Record<string, string> = {
   bb84_eavesdrop: "bb84",
@@ -75,72 +70,6 @@ const STUDIO_ALIASES: Record<string, string> = {
   qec_3qubit_repetition: "qec",
 }
 
-const DRAWER_TEMPLATE_GROUPS = [
-  {
-    id: "foundational",
-    label: "FOUNDATIONAL ALGORITHMS",
-    items: [
-      { id: "deutsch", label: "Deutsch Algorithm" },
-      { id: "deutsch_jozsa", label: "Deutsch-Jozsa Algorithm" },
-      { id: "bernstein_vazirani", label: "Bernstein-Vazirani Algorithm" },
-      { id: "simon", label: "Simon's Algorithm" },
-    ],
-  },
-  {
-    id: "communication_security",
-    label: "COMMUNICATION & SECURITY",
-    items: [
-      { id: "bell_pair", label: "Bell Pair Starter" },
-      { id: "bb84_eavesdrop", label: "BB84 With Eve" },
-      { id: "teleportation_simplified", label: "Teleportation Walkthrough" },
-      { id: "superdense_simplified", label: "Superdense Coding" },
-      { id: "n_qubit_teleportation", label: "N-Qubit Teleportation" },
-      { id: "veto_algorithm", label: "Veto Algorithm" },
-      { id: "qpc_socialist_millionaire", label: "QPC (Socialist Millionaire)" },
-    ],
-  },
-  {
-    id: "search_math",
-    label: "SEARCH & MATH",
-    items: [
-      { id: "grover_search", label: "Grover's Search" },
-      { id: "qft_3qubit", label: "Quantum Fourier Transform" },
-      { id: "qpe_simple", label: "Quantum Phase Estimation" },
-      { id: "shor_factorization", label: "Shor's Algorithm – Factorization" },
-      { id: "hhl_algorithm", label: "HHL Algorithm" },
-    ],
-  },
-  {
-    id: "qml",
-    label: "QUANTUM MACHINE LEARNING",
-    items: [
-      { id: "qsvm", label: "QSVM Algorithm" },
-      { id: "qkmean", label: "QKmean Algorithm" },
-      { id: "qknn", label: "QKNN Algorithm" },
-      { id: "qhc", label: "QHC Algorithm" },
-      { id: "qpca", label: "QPCA Algorithm" },
-      { id: "qperceptron", label: "QPerceptron Algorithm" },
-      { id: "qnn", label: "QNN Algorithm" },
-      { id: "qaoa_maxcut", label: "QAOA MaxCut" },
-    ],
-  },
-  {
-    id: "chemistry_simulation",
-    label: "CHEMISTRY & SIMULATION",
-    items: [
-      { id: "vqe_h2", label: "VQE Ansatz (H₂ molecule)" },
-      { id: "quantum_walk_1d", label: "Quantum Walk (1D)" },
-    ],
-  },
-  {
-    id: "error_correction",
-    label: "ERROR CORRECTION (QEC)",
-    items: [
-      { id: "qec_3qubit_repetition", label: "QEC: Three-Qubit Repetition Code" },
-      { id: "qec_shor_9qubit", label: "QEC: Shor's Nine-Qubit Code" },
-    ],
-  },
-] as const
 
 type InspectorTab = (typeof INSPECTOR_TABS)[number]["id"]
 
@@ -238,6 +167,7 @@ function circuitSignature(input: { nQubits: number; gates: Omit<CircuitGate, "id
 }
 
 export function WorkspacePage() {
+  const location = useLocation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [source, setSource] = useState(DEFAULT_PROGRAM)
@@ -251,8 +181,6 @@ export function WorkspacePage() {
   const [benchmarking, setBenchmarking] = useState(false)
   const [activeStep, setActiveStep] = useState(0)
   const [activeInspector, setActiveInspector] = useState<InspectorTab>("studio")
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [docsOpen, setDocsOpen] = useState(false)
   const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false)
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
   const [presetPickerValue, setPresetPickerValue] = useState("")
@@ -261,6 +189,7 @@ export function WorkspacePage() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const executionTokenRef = useRef(0)
   const requestedTemplateRef = useRef<string | null>(null)
+  const injectedSourceLockRef = useRef<string | null>(null)
   // Sync guard: set to true while the parser is writing to the circuit store
   // so the Visual→Text effect ignores that echo update.
   const isParserWritingRef = useRef(false)
@@ -286,6 +215,7 @@ export function WorkspacePage() {
   const loadTemplate = useSimStore((s) => s.loadTemplate)
   const engine = useSimStore((s) => s.engine)
   const setEngine = useSimStore((s) => s.setEngine)
+  const clearActiveTemplateContext = useSimStore((s) => s.clearActiveTemplateContext)
   const activeTemplateCategory = useSimStore((s) => s.activeTemplateCategory)
   const activeTemplateBaseCode = useSimStore((s) => s.activeTemplateBaseCode)
 
@@ -415,6 +345,19 @@ export function WorkspacePage() {
     navigate("/workspace", { replace: true })
   }, [navigate, searchParams, templateById])
 
+  useEffect(() => {
+    const injectedState = location.state as { circuit?: string; format?: "openqasm" | "qunetsim" | "custom" } | null
+    if (!injectedState?.circuit) return
+
+    injectedSourceLockRef.current = injectedState.circuit
+    clearActiveTemplateContext(
+      injectedState.format ?? "custom",
+      injectedState.format === "qunetsim" ? "protocol" : injectedState.format === "openqasm" ? "algorithm" : null,
+    )
+    setSource(injectedState.circuit)
+    navigate("/workspace", { replace: true, state: null })
+  }, [clearActiveTemplateContext, location.state, navigate])
+
   // Simulation is only triggered by explicit user action (Run button).
   // No auto-run on source change.
 
@@ -422,6 +365,8 @@ export function WorkspacePage() {
   // Visual → Text: when the user edits the circuit grid, regenerate pseudocode.
   // Bails immediately if the parser was the one that just wrote the circuit.
   useEffect(() => {
+    if (engine !== "custom") return
+    if (injectedSourceLockRef.current) return
     if (isParserWritingRef.current) return
     const nextSource = circuitSnapshotToProgram({
       nQubits: circuitQubitCount,
@@ -461,10 +406,13 @@ export function WorkspacePage() {
     if (nextSignature === currentSignature) return
     isParserWritingRef.current = true
     useCircuitStore.getState().replaceCircuit(snapshot.gates, snapshot.nQubits, snapshot.initialStates)
+    if (injectedSourceLockRef.current === source) {
+      injectedSourceLockRef.current = null
+    }
     queueMicrotask(() => {
       isParserWritingRef.current = false
     })
-  }, [canSyncCircuit, parsed.instructions, circuitQubitCount, circuitGates, circuitInitialStates])
+  }, [canSyncCircuit, parsed.instructions, circuitQubitCount, circuitGates, circuitInitialStates, source])
 
   async function executeProgram(code: string) {
     const executionToken = executionTokenRef.current + 1
@@ -632,14 +580,12 @@ export function WorkspacePage() {
     const option = selectionOptions.find((item) => item.value === `template:${templateId}`)
     if (option) {
       applySelection(option)
-      setDrawerOpen(false)
       return
     }
     // Fallback: catalog may still be loading — load directly from the catalog map
     const template = templateById.get(templateId)
     if (template) {
       loadTemplate(template).then(hydrated => setSource(hydrated))
-      setDrawerOpen(false)
     }
     // If neither is available yet, delay close so the user can see the item is pending
   }
@@ -677,146 +623,44 @@ export function WorkspacePage() {
 
   return (
     <div style={pageShellStyle}>
-      {/* ── Fixed top navbar & drawer — all inside one Dialog.Root ── */}
-      <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <nav style={topNavStyle}>
-          <Dialog.Trigger asChild>
-            <button type="button" style={navHamburgerStyle} aria-label="Open navigation menu">
-              <Menu size={18} />
-            </button>
-          </Dialog.Trigger>
-          <div style={navWorkspaceLabelStyle}>QPAL WORKSPACE</div>
-          <div style={navCenterStyle}>
-            <Tooltip.Provider delayDuration={140}>
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <button type="button" style={navTitleButtonStyle}>
-                    <span>{selectedModel?.title ?? "Quantum Experimentation Workspace"}</span>
-                    <CircleHelp size={14} style={{ opacity: 0.7 }} />
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content side="bottom" align="center" sideOffset={8} style={titleTooltipStyle}>
-                    {selectedModel?.description ??
-                      "Define quantum algorithms and protocols in pseudocode, simulate execution, and inspect runtime state."}
-                    <Tooltip.Arrow style={{ fill: "#171d2c" }} />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            </Tooltip.Provider>
+      <nav style={topNavStyle}>
+        <div style={navControlsStyle}>
+          <Link to="/" style={headerLinkButtonStyle}>
+            <House size={14} />
+            Home
+          </Link>
+          <button
+            type="button"
+            style={{ ...headerExecButtonStyle, borderColor: "var(--accent-green)", color: "var(--accent-green)" }}
+            onClick={() => setPreflightOpen(true)}
+            disabled={!source.trim() || running}
+          >
+            <Play size={14} />
+            {running ? "Running" : "Run All"}
+          </button>
+          <button type="button" style={headerExecButtonStyle} onClick={handleStepExecution} disabled={running}>
+            <StepForward size={14} />
+            Step
+          </button>
+          <button type="button" style={headerExecButtonStyle} onClick={handleResetExecution} disabled={running}>
+            <RotateCcw size={14} />
+            Reset
+          </button>
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={navControlsStyle}>
+          <AppModeToggle />
+          <ThemeToggleButton label="Dark" active={theme === "dark"} onClick={() => setTheme("dark")} />
+          <ThemeToggleButton label="Light" active={theme === "light"} onClick={() => setTheme("light")} />
+          <Link to="/explore" style={headerLinkButtonStyle}>
+            <BookOpenText size={14} />
+            Explore
+          </Link>
+          <div style={authUserButtonShellStyle}>
+            <UserButton />
           </div>
-          <div style={navControlsStyle}>
-            <Link to="/" style={headerLinkButtonStyle}>
-              <House size={14} />
-              Home
-            </Link>
-            <Link to="/explore" style={headerLinkButtonStyle}>
-              <BookOpenText size={14} />
-              Explore
-            </Link>
-            <button
-              type="button"
-              style={{ ...headerExecButtonStyle, borderColor: "var(--accent-green)", color: "var(--accent-green)" }}
-              onClick={() => setPreflightOpen(true)}
-              disabled={!source.trim() || running}
-            >
-              <Play size={14} />
-              {running ? "Running" : "Run All"}
-            </button>
-            <button type="button" style={headerExecButtonStyle} onClick={handleStepExecution} disabled={running}>
-              <StepForward size={14} />
-              Step
-            </button>
-            <button type="button" style={headerExecButtonStyle} onClick={handleResetExecution} disabled={running}>
-              <RotateCcw size={14} />
-              Reset
-            </button>
-            <AppModeToggle />
-            <ThemeToggleButton label="Dark" active={theme === "dark"} onClick={() => setTheme("dark")} />
-            <ThemeToggleButton label="Light" active={theme === "light"} onClick={() => setTheme("light")} />
-            <SignOutButton style={headerExecButtonStyle} />
-            <div style={authUserButtonShellStyle}>
-              <UserButton />
-            </div>
-          </div>
-        </nav>
-
-        {/* Drawer portal renders to document.body, connected via Dialog.Root context */}
-        <Dialog.Portal>
-          <Dialog.Overlay style={drawerOverlayStyle} />
-          <Dialog.Content style={drawerContentStyle}>
-            <div style={drawerHeaderStyle}>
-              <div>
-                <div style={eyebrowStyle}>QPAL NAVIGATION</div>
-                <Dialog.Title style={{ fontSize: 20, marginBottom: 4 }}>Workspace Menu</Dialog.Title>
-                <Dialog.Description style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                  Browse algorithm and protocol templates, open docs, or run benchmarks.
-                </Dialog.Description>
-              </div>
-            </div>
-
-            <Accordion.Root
-              type="multiple"
-              defaultValue={[DRAWER_TEMPLATE_GROUPS[0].id, DRAWER_TEMPLATE_GROUPS[1].id]}
-              style={{ display: "flex", flexDirection: "column", gap: 10 }}
-            >
-              {DRAWER_TEMPLATE_GROUPS.map((group) => (
-                <Accordion.Item key={group.id} value={group.id} style={drawerSectionStyle}>
-                  <Accordion.Header>
-                    <Accordion.Trigger style={drawerAccordionTriggerStyle}>
-                      {group.label}
-                      <ChevronDown size={14} />
-                    </Accordion.Trigger>
-                  </Accordion.Header>
-                  <Accordion.Content style={drawerAccordionContentStyle}>
-                    {group.items.map((item) => {
-                      const template = templateById.get(item.id)
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className="drawer-template-item"
-                          style={drawerTemplateButtonStyle}
-                          onClick={() => applyTemplateById(item.id)}
-                          disabled={!template}
-                          title={template ? template.description : "Template unavailable"}
-                        >
-                          {item.label}
-                        </button>
-                      )
-                    })}
-                  </Accordion.Content>
-                </Accordion.Item>
-              ))}
-            </Accordion.Root>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button
-                type="button"
-                style={drawerActionLinkStyle}
-                onClick={() => {
-                  setDrawerOpen(false)
-                  setDocsOpen(true)
-                }}
-              >
-                <BookOpenText size={14} />
-                Open docs page
-              </button>
-              <button
-                type="button"
-                style={drawerActionButtonStyle}
-                onClick={() => {
-                  setDrawerOpen(false)
-                  setBenchmarkModalOpen(true)
-                }}
-              >
-                <Cpu size={14} />
-                Benchmarks
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+        </div>
+      </nav>
 
       <Dialog.Root open={benchmarkModalOpen} onOpenChange={setBenchmarkModalOpen}>
         <Dialog.Portal>
@@ -904,7 +748,7 @@ export function WorkspacePage() {
         />
       )}
 
-      <DocumentationModal open={docsOpen} onOpenChange={setDocsOpen} templates={catalog?.templates ?? []} />
+
 
       <div ref={containerRef} className="workspace-main" style={{ "--workspace-right-width": `${rightPaneWidth}px` } as CSSProperties}>
         <section className="workspace-pane workspace-left-pane">
@@ -984,7 +828,7 @@ export function WorkspacePage() {
 
           <SectionCard
             title="Inspector"
-            subtitle="Inspect state, Bloch vectors, analysis, and model-specific docs from here."
+            subtitle="Inspect state, Bloch vectors, and analysis from here."
             style={{ display: "flex", flexDirection: "column" }}
             action={
               <div style={tabRailStyle}>
@@ -1008,7 +852,6 @@ export function WorkspacePage() {
             {activeInspector === "studio" && <LearningStudioPanel />}
             {activeInspector === "state" && <StateInspector state={selectedState} instructions={parsed.instructions} stepLabel={selectedStep?.event ?? "No active step"} />}
             {activeInspector === "bloch" && <BlochInspector state={selectedState} />}
-            {activeInspector === "docs" && <DocsPanel syntax={catalog?.syntax ?? []} templates={filteredTemplates} notes={catalog?.architecture_notes ?? []} context={inspectorContext} />}
             {activeInspector === "analysis" && (
               <WorkspaceAnalysisPanel
                 presetLabel={selectedModel?.title ?? null}
@@ -1109,7 +952,6 @@ function IssuePanel({
 
   return (
     <div style={supportPanelStyle}>
-      <div style={eyebrowStyle}>{title}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {errors.map((issue) => (
           <IssueRow key={`error-${issue.line}-${issue.message}`} issue={issue} tone="danger" />
@@ -1265,92 +1107,157 @@ const authUserButtonShellStyle: CSSProperties = {
   alignItems: "center",
 }
 
-const drawerOverlayStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0, 0, 0, 0.5)",
-  zIndex: 40,
-}
-
-const drawerContentStyle: CSSProperties = {
-  position: "fixed",
-  left: 0,
-  top: 0,
-  bottom: 0,
-  width: "min(420px, 92vw)",
-  zIndex: 45,
-  background: "var(--bg-panel)",
-  borderRight: "1px solid var(--border)",
-  padding: "18px 14px 14px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 14,
-  overflowY: "auto",
-}
-
-const drawerHeaderStyle: CSSProperties = {
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
-  padding: "12px",
-}
-
-const drawerSectionStyle: CSSProperties = {
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
-}
-
-const drawerAccordionTriggerStyle: CSSProperties = {
-  width: "100%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "10px 12px",
-  fontWeight: 700,
-}
-
-const drawerAccordionContentStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  padding: "0 10px 10px",
-}
-
-const drawerTemplateButtonStyle: CSSProperties = {
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-active)",
-  padding: "8px 10px",
-  textAlign: "left",
-  fontSize: 13,
-  fontWeight: 500,
-  color: "var(--text-primary)",
-}
-
-const drawerActionLinkStyle: CSSProperties = {
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
-  padding: "10px 12px",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  color: "var(--text-primary)",
-  textDecoration: "none",
-}
-
-const drawerActionButtonStyle: CSSProperties = {
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--accent-cyan)",
-  background: "var(--accent-cyan)",
-  color: "var(--button-primary-text)",
-  padding: "10px 12px",
+const primaryButtonStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
   gap: 8,
+  padding: "10px 14px",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--accent-cyan)",
+  background: "var(--accent-cyan)",
+  color: "var(--button-primary-text)",
   fontWeight: 700,
+}
+
+const benchmarkStatsGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+  gap: 10,
+}
+
+const benchmarkRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  flexWrap: "wrap",
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-active)",
+  padding: "10px 12px",
+}
+
+const benchmarkBarTrackStyle: CSSProperties = {
+  height: 8,
+  borderRadius: 999,
+  background: "rgba(122, 223, 196, 0.12)",
+  overflow: "hidden",
+}
+
+const benchmarkBarFillStyle: CSSProperties = {
+  height: "100%",
+  borderRadius: 999,
+  background: "linear-gradient(90deg, var(--accent-cyan), var(--accent-green))",
+}
+
+const splitWorkspaceHostStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  minHeight: 0,
+  flex: 1,
+  gap: 14,
+}
+
+const stackedWorkspaceShellStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+  minHeight: 0,
+}
+
+const stackedTopPaneStyle: CSSProperties = {
+  minHeight: 0,
+}
+
+const terminalPaneStyle: CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-panel)",
+  padding: 14,
+  minHeight: 0,
+}
+
+const editorHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  marginBottom: 12,
+}
+
+const engineSelectStyle: CSSProperties = {
+  minWidth: 180,
+  height: 36,
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  color: "var(--text-primary)",
+  padding: "0 12px",
+}
+
+const editorHeaderIconsStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+}
+
+const editorHeaderIconButtonStyle: CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  color: "var(--text-secondary)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const syntaxChipRailStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+  marginBottom: 12,
+}
+
+const sectionCardStyle: CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-panel)",
+  padding: 16,
+  minHeight: 0,
+}
+
+const sectionHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 12,
+  flexWrap: "wrap",
+  marginBottom: 14,
+}
+
+const tabRailStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+}
+
+const tabButtonStyle: CSSProperties = {
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  padding: "8px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+}
+
+const supportPanelStyle: CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-elevated)",
+  padding: "14px",
+  minHeight: 0,
 }
 
 const modalOverlayStyle: CSSProperties = {
@@ -1375,181 +1282,6 @@ const benchmarkModalStyle: CSSProperties = {
   padding: 16,
   display: "flex",
   flexDirection: "column",
-  gap: 14,
-}
-
-const benchmarkStatsGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-  gap: 10,
-}
-
-const benchmarkRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  flexWrap: "wrap",
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-active)",
-  padding: "10px 12px",
-}
-
-const benchmarkBarTrackStyle: CSSProperties = {
-  height: 8,
-  borderRadius: 999,
-  background: "rgba(88, 164, 146, 0.15)",
-  overflow: "hidden",
-}
-
-const benchmarkBarFillStyle: CSSProperties = {
-  height: "100%",
-  background: "var(--accent-cyan)",
-}
-
-const sectionCardStyle: CSSProperties = {
-  borderRadius: "var(--radius-xl)",
-  border: "1px solid var(--border)",
-  background: "linear-gradient(180deg, var(--bg-panel), var(--bg-elevated))",
-  boxShadow: "var(--shadow-card)",
-  padding: "16px",
-  minHeight: 0,
-  display: "flex",
-  flexDirection: "column",
-}
-
-const sectionHeaderStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 14,
-  alignItems: "flex-start",
-  marginBottom: 14,
-  flexWrap: "wrap",
-}
-
-const supportPanelStyle: CSSProperties = {
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--border)",
-  background: "var(--bg-card)",
-  padding: "14px",
-  minHeight: 0,
-}
-
-const primaryButtonStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "10px 14px",
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--accent-cyan)",
-  background: "var(--accent-cyan)",
-  color: "var(--button-primary-text)",
-  fontWeight: 700,
-  height: "fit-content",
-}
-
-const tabRailStyle: CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-}
-
-const workspaceViewActionStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-end",
-  gap: 10,
-  flexWrap: "wrap",
-}
-
-const tabButtonStyle: CSSProperties = {
-  padding: "8px 12px",
-  borderRadius: "var(--radius-md)",
-  border: "1px solid var(--border)",
-  fontSize: 12,
-  fontWeight: 600,
-}
-
-const stackedWorkspaceShellStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-  flex: 1,
-  width: "100%",
-  height: "100%",
-  minHeight: 0,
-}
-
-const splitWorkspaceHostStyle: CSSProperties = {
-  flex: 1,
-  minHeight: 0,
-  width: "100%",
-  display: "flex",
-}
-
-const stackedTopPaneStyle: CSSProperties = {
-  flex: "1 1 58%",
-  minHeight: 320,
-}
-
-const terminalPaneStyle: CSSProperties = {
-  flex: "1 1 42%",
-  borderRadius: "var(--radius-lg)",
-  border: "1px solid #2a2f3f",
-  background: "#111622",
-  padding: "10px 10px 12px",
-  display: "flex",
-  flexDirection: "column",
-  minHeight: 260,
-}
-
-const editorHeaderStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 10,
-  marginBottom: 10,
-  padding: "6px 8px",
-  borderRadius: "var(--radius-md)",
-  border: "1px solid #2a3248",
-  background: "#0c111d",
-}
-
-const engineSelectStyle: CSSProperties = {
-  minWidth: 180,
-  maxWidth: 240,
-  borderRadius: "var(--radius-sm)",
-  border: "1px solid #2f3a53",
-  background: "#171d2c",
-  color: "#d4def4",
-  padding: "6px 10px",
-  fontSize: 12,
-  fontFamily: "var(--font-mono)",
-}
-
-const editorHeaderIconsStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-}
-
-const editorHeaderIconButtonStyle: CSSProperties = {
-  width: 24,
-  height: 24,
-  borderRadius: "var(--radius-sm)",
-  border: "1px solid #2f3a53",
-  background: "#171d2c",
-  color: "#a5b4d6",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-}
-
-const syntaxChipRailStyle: CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  marginBottom: 12,
 }
 
 const syntaxChipStyle: CSSProperties = {
@@ -1594,4 +1326,6 @@ const eyebrowStyle: CSSProperties = {
   letterSpacing: "0.08em",
   marginBottom: 8,
 }
+
+
 

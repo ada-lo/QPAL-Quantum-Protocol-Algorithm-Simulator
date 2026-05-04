@@ -69,6 +69,7 @@ export interface SimState {
 
   loadTemplate: (template: WorkspaceTemplate) => Promise<string>
   updateParameter: (key: string, value: any) => string | null
+  clearActiveTemplateContext: (engine: 'custom' | 'openqasm' | 'qunetsim', category: 'algorithm' | 'protocol' | null) => void
 
   reset: () => void
 }
@@ -294,6 +295,14 @@ export const useSimStore = create<SimState>((set, get) => ({
 
     return hydrated
   },
+
+  clearActiveTemplateContext: (engine, category) => set({
+    activeTemplate: null,
+    activeTemplateBaseCode: null,
+    templateParams: {},
+    activeTemplateCategory: category,
+    engine,
+  }),
 
   reset: () => set({ result: null, snapshots: [], loading: false, error: null, streamStep: 0 }),
 }))
