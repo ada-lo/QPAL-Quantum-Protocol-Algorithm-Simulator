@@ -71,15 +71,25 @@ export interface SimState {
 
   loadTemplate: (template: WorkspaceTemplate) => Promise<string>
   updateParameter: (key: string, value: any) => string | null
+  setActiveTemplateContext: (
+    template: WorkspaceTemplate,
+    engine: 'custom' | 'openqasm' | 'qunetsim',
+    baseCode?: string | null,
+  ) => void
   clearActiveTemplateContext: (engine: 'custom' | 'openqasm' | 'qunetsim', category: 'algorithm' | 'protocol' | null) => void
 
   reset: () => void
 }
 
-function hydrateTemplateCode(template: WorkspaceTemplate | null, baseCode: string, params: Record<string, any>) {
+function hydrateTemplateCode(
+  template: WorkspaceTemplate | null,
+  baseCode: string,
+  params: Record<string, any>,
+  engine: "custom" | "openqasm" | "qunetsim",
+) {
   const topic = template ? getTopicByCatalogKey(template.id) : null
   if (topic?.inputs?.length) {
-    return buildPreviewCode(topic, params, template)
+    return buildPreviewCode(topic, params, template, engine)
   }
 
   let hydrated = baseCode
@@ -221,9 +231,9 @@ export const useSimStore = create<SimState>((set, get) => ({
         probabilities,
         fidelity: 1.0,
         nQubits,
-        shots: 0,
+        shots: response.shots ?? response.summary.measurements ?? 0,
         blochVectors,
-        counts: {},
+        counts: response.counts ?? {},
       },
       snapshots,
     })
@@ -307,7 +317,7 @@ export const useSimStore = create<SimState>((set, get) => ({
       return presetCode
     }
 
-    const hydrated = hydrateTemplateCode(template, template.code, params)
+    const hydrated = hydrateTemplateCode(template, template.code, params, apiEngine)
     set({ activeTemplateBaseCode: hydrated })
     return hydrated
   },
@@ -319,7 +329,26 @@ export const useSimStore = create<SimState>((set, get) => ({
     const newParams = { ...templateParams, [key]: value }
     set({ templateParams: newParams })
 
-    return hydrateTemplateCode(activeTemplate, activeTemplateBaseCode, newParams)
+    return hydrateTemplateCode(activeTemplate, activeTemplateBaseCode, newParams, get().engine)
+  },
+
+  setActiveTemplateContext: (template, engine, baseCode = null) => {
+    const topic = getTopicByCatalogKey(template.id)
+    const params: Record<string, any> = topic?.inputs?.length
+      ? buildInitialInputValues(topic)
+      : {}
+    if (!topic?.inputs?.length && template.parameters) {
+      template.parameters.forEach((p) => { params[p.name] = p.default })
+    }
+    const category: 'algorithm' | 'protocol' = template.kind === 'protocol' ? 'protocol' : 'algorithm'
+
+    set({
+      engine,
+      activeTemplate: template,
+      activeTemplateBaseCode: baseCode ?? template.code,
+      templateParams: params,
+      activeTemplateCategory: category,
+    })
   },
 
   clearActiveTemplateContext: (engine, category) => set({

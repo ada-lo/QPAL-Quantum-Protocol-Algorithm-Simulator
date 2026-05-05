@@ -62,6 +62,8 @@ class BaseQuantumEngine(ABC):
         measurements: list[MeasurementRecord] | None = None,
         statevector: list[float] | None = None,
         bloch_vectors: list[WorkspaceBlochVector] | None = None,
+        shots: int | None = None,
+        counts: dict[str, int] | None = None,
         warnings: list[str] | None = None,
         engine: str = "simplified-workspace-backend",
     ) -> Union[WorkspaceAlgorithmResponse, WorkspaceProtocolResponse]:
@@ -81,6 +83,8 @@ class BaseQuantumEngine(ABC):
         _actors = actors or []
         _transmissions = transmissions or []
         _measurements = measurements or []
+        _shots = shots or 0
+        _counts = counts or {}
         _warnings = warnings or []
 
         # ── Inject per-step state (dual-track guarantee) ───────────────
@@ -112,6 +116,8 @@ class BaseQuantumEngine(ABC):
                 measurements=_measurements,
                 statevector=_statevector,
                 bloch_vectors=_bloch_vectors,
+                shots=_shots,
+                counts=_counts,
                 warnings=_warnings,
             )
         else:
@@ -122,6 +128,8 @@ class BaseQuantumEngine(ABC):
                 steps=steps,
                 statevector=_statevector,
                 bloch_vectors=_bloch_vectors,
+                shots=_shots,
+                counts=_counts,
                 warnings=_warnings,
             )
 

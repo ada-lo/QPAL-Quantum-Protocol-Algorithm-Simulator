@@ -104,6 +104,8 @@ class WorkspaceAlgorithmResponse(BaseModel):
     steps: list[WorkspaceExecutionStep] = Field(default_factory=list)
     statevector: list[float] = Field(default_factory=list)  # flat [re0, im0, re1, im1, ...]
     bloch_vectors: list[WorkspaceBlochVector] = Field(default_factory=list)
+    shots: int = 0
+    counts: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -119,6 +121,8 @@ class WorkspaceProtocolResponse(BaseModel):
     measurements: list[MeasurementRecord] = Field(default_factory=list)
     statevector: list[float] = Field(default_factory=list)  # flat [re0, im0, re1, im1, ...]
     bloch_vectors: list[WorkspaceBlochVector] = Field(default_factory=list)
+    shots: int = 0
+    counts: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
 
 

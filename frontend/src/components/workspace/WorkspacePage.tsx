@@ -227,6 +227,7 @@ export function WorkspacePage() {
   const loadTemplate = useSimStore((s) => s.loadTemplate)
   const engine = useSimStore((s) => s.engine)
   const setEngine = useSimStore((s) => s.setEngine)
+  const setActiveTemplateContext = useSimStore((s) => s.setActiveTemplateContext)
   const clearActiveTemplateContext = useSimStore((s) => s.clearActiveTemplateContext)
   const activeTemplateCategory = useSimStore((s) => s.activeTemplateCategory)
   const activeTemplateBaseCode = useSimStore((s) => s.activeTemplateBaseCode)
@@ -378,16 +379,20 @@ export function WorkspacePage() {
     if (!injectedState?.circuit) return
 
     injectedSourceLockRef.current = injectedState.circuit
-    clearActiveTemplateContext(
-      injectedState.format ?? "custom",
-      injectedState.category ?? (injectedState.format === "qunetsim" ? "protocol" : injectedState.format === "openqasm" ? "algorithm" : null),
-    )
+    const injectedEngine = injectedState.format ?? "custom"
+    const injectedCategory = injectedState.category ?? (injectedEngine === "qunetsim" ? "protocol" : injectedEngine === "openqasm" ? "algorithm" : null)
+    const injectedTemplate = injectedState.templateId ? templateById.get(injectedState.templateId) ?? null : null
+    if (injectedTemplate) {
+      setActiveTemplateContext(injectedTemplate, injectedEngine, injectedState.circuit)
+    } else {
+      clearActiveTemplateContext(injectedEngine, injectedCategory)
+    }
     if (injectedState.templateId) {
       setSelectedModelValue(`template:${injectedState.templateId}`)
     }
     setSource(injectedState.circuit)
     navigate("/workspace", { replace: true, state: null })
-  }, [clearActiveTemplateContext, location.state, navigate])
+  }, [clearActiveTemplateContext, location.state, navigate, setActiveTemplateContext, templateById])
 
   // Simulation is only triggered by explicit user action (Run button).
   // No auto-run on source change.

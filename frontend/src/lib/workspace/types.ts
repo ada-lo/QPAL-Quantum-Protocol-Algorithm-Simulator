@@ -100,6 +100,8 @@ export interface WorkspaceAlgorithmResponse {
   steps: WorkspaceExecutionStep[]
   statevector: number[]   // flat [re0, im0, re1, im1, ...]
   bloch_vectors: WorkspaceBlochVector[]
+  shots: number
+  counts: Record<string, number>
   warnings: string[]
 }
 
@@ -114,6 +116,8 @@ export interface WorkspaceProtocolResponse {
   measurements: WorkspaceMeasurementRecord[]
   statevector: number[]   // flat [re0, im0, re1, im1, ...]
   bloch_vectors: WorkspaceBlochVector[]
+  shots: number
+  counts: Record<string, number>
   warnings: string[]
 }
 

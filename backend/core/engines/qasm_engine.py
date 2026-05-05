@@ -276,6 +276,8 @@ def _execute_qasm_impl(engine: QASMEngine, req: WorkspaceSimulateRequest):
             steps=steps,
             statevector=final_state.statevector,
             bloch_vectors=list(final_state.bloch_vectors),
+            shots=sum(counts.values()),
+            counts=dict(counts),
             warnings=warnings,
         )
     except Exception as exc:
