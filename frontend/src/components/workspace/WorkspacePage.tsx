@@ -34,13 +34,13 @@ import { WorkspaceCircuitBuilder } from "./WorkspaceCircuitBuilder"
 import { PreFlightModal } from "./PreFlightModal"
 import { StepWalkthroughModal } from "./StepWalkthroughModal"
 
-const DEFAULT_PROGRAM = `LABEL Bell Pair
-INIT q0
-INIT q1
-H q0
-CNOT q0 q1
-MEASURE q0 BASIS Z
-MEASURE q1 BASIS Z`
+const DEFAULT_PROGRAM = ``
+
+
+
+
+
+
 
 const INSPECTOR_TABS = [
   { id: "studio", label: "Studio 3D" },
@@ -189,9 +189,9 @@ export function WorkspacePage() {
   const [benchmarks, setBenchmarks] = useState<WorkspaceBenchmarkResponse | null>(null)
   const [benchmarking, setBenchmarking] = useState(false)
   const [activeStep, setActiveStep] = useState(0)
-  const [activeInspector, setActiveInspector] = useState<InspectorTab>("studio")
+  const [activeInspector, setActiveInspector] = useState<InspectorTab>("state")
   const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false)
-  const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
+  const [selectedModelValue, setSelectedModelValue] = useState("")
   const [presetPickerValue, setPresetPickerValue] = useState("")
   const [templateDrawerOpen, setTemplateDrawerOpen] = useState(false)
   const [templateSearch, setTemplateSearch] = useState("")
@@ -313,7 +313,7 @@ export function WorkspacePage() {
       return { errors: [], warnings: [], instructions: [], qubits: [], actors: [] }
     }
   }, [source, engine])
-  const canSyncCircuit = engine === "custom" && parsed.errors.length === 0 && parsed.instructions.length > 0
+  const canSyncCircuit = engine === "custom" && parsed.errors.length === 0
   const selectedStep = simulation?.steps[Math.min(activeStep, Math.max(simulation.steps.length - 1, 0))] ?? null
   const selectedState = selectedStep?.state ?? null
   const inspectorContext = selectedModel
@@ -353,11 +353,11 @@ export function WorkspacePage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (selectionOptions.length > 0 && !selectionOptions.some((option) => option.value === selectedModelValue)) {
-      setSelectedModelValue(selectionOptions[0].value)
-    }
-  }, [selectionOptions, selectedModelValue])
+
+
+
+
+
 
   useEffect(() => {
     const templateId = searchParams.get("template")
