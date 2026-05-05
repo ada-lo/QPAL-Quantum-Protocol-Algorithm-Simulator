@@ -1,0 +1,43 @@
+# ============================================================
+# Superdense Coding — QuNetSim
+# Matches the custom pseudocode flow: encode with Z and X, then send.
+# ============================================================
+from qunetsim.components import Host, Network
+from qunetsim.objects import Qubit
+import time
+
+
+def main():
+    network = Network.get_instance()
+    network.start(["Alice", "Bob"])
+
+    alice = Host("Alice")
+    alice.add_connection("Bob")
+    alice.start()
+
+    bob = Host("Bob")
+    bob.add_connection("Alice")
+    bob.start()
+
+    network.add_host(alice)
+    network.add_host(bob)
+
+    print("[Alice] Encoding message 11 using Z then X before sending.")
+    q = Qubit(alice)
+    q.H()
+    q.Z()
+    q.X()
+    alice.send_qubit("Bob", q, await_ack=True)
+
+    time.sleep(1)
+    received = bob.get_qubit("Alice", wait=5)
+    if received is not None:
+        print(f"[Bob] Received encoded qubit. Measurement: {received.measure()}")
+    else:
+        print("[Bob] No qubit received.")
+
+    network.stop(stop_hosts=True)
+
+
+if __name__ == "__main__":
+    main()

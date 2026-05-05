@@ -1,0 +1,50 @@
+// ============================================================
+// QEC: Shor's Nine-Qubit Code — OpenQASM 3.0
+// Matches the custom pseudocode logic as a simplified syndrome demo.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+qubit[11] q;
+bit[2] syndrome;
+
+// q[0..8] data qubits, q[9..10] ancillas
+reset q[0];
+reset q[1];
+reset q[2];
+reset q[3];
+reset q[4];
+reset q[5];
+reset q[6];
+reset q[7];
+reset q[8];
+reset q[9];
+reset q[10];
+
+// Outer phase-protection layer
+h q[0];
+h q[3];
+h q[6];
+
+// Inner bit-flip repetition layer
+cx q[0], q[1];
+cx q[0], q[2];
+cx q[3], q[4];
+cx q[3], q[5];
+cx q[6], q[7];
+cx q[6], q[8];
+
+// Simulate a single phase-flip error
+z q[0];
+
+// Simple syndrome checks
+cx q[0], q[9];
+cx q[1], q[9];
+syndrome[0] = measure q[9];
+
+h q[0];
+h q[3];
+h q[6];
+cx q[0], q[10];
+cx q[3], q[10];
+syndrome[1] = measure q[10];

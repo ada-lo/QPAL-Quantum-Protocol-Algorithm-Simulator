@@ -1,6 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog"
 import { UserButton } from "@neondatabase/neon-js/auth/react/ui"
-import { BookOpenText, Cpu, House, Info, MoreHorizontal, Play, RefreshCw, RotateCcw, StepForward } from "lucide-react"
+import { BookOpenText, Cpu, House, Info, Menu, MoreHorizontal, Play, RefreshCw, RotateCcw, Search, StepForward, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { Editor } from "@monaco-editor/react"
@@ -42,7 +42,6 @@ CNOT q0 q1
 MEASURE q0 BASIS Z
 MEASURE q1 BASIS Z`
 
-const QUICK_SYNTAX = ["INIT q0", "H q0", "CNOT q0 q1", "MEASURE q0 BASIS X", "SEND q0 Alice Bob", "INTERCEPT q0 Eve"]
 const INSPECTOR_TABS = [
   { id: "studio", label: "Studio 3D" },
   { id: "state", label: "State" },
@@ -72,6 +71,7 @@ const STUDIO_ALIASES: Record<string, string> = {
 
 
 type InspectorTab = (typeof INSPECTOR_TABS)[number]["id"]
+type TemplateCategoryFilter = "all" | "algorithm" | "protocol"
 
 interface WorkspaceModelOption {
   value: string
@@ -166,6 +166,15 @@ function circuitSignature(input: { nQubits: number; gates: Omit<CircuitGate, "id
   return `${input.nQubits}::${input.initialStates.join(",")}::${gateParts}`
 }
 
+function matchesTemplateFilter(template: WorkspaceTemplate, query: string, category: TemplateCategoryFilter) {
+  const normalizedQuery = normalizeToken(query)
+  const inCategory = category === "all" || template.kind === category
+  if (!inCategory) return false
+  if (!normalizedQuery) return true
+  const haystack = [template.id, template.title, template.description, ...template.tags].map(normalizeToken).join(" ")
+  return haystack.includes(normalizedQuery)
+}
+
 export function WorkspacePage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -184,6 +193,9 @@ export function WorkspacePage() {
   const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false)
   const [selectedModelValue, setSelectedModelValue] = useState("template:bell_pair")
   const [presetPickerValue, setPresetPickerValue] = useState("")
+  const [templateDrawerOpen, setTemplateDrawerOpen] = useState(false)
+  const [templateSearch, setTemplateSearch] = useState("")
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState<TemplateCategoryFilter>("all")
   const [rightPaneWidth, setRightPaneWidth] = useState(430)
   const { theme, setTheme } = useThemeMode()
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -278,6 +290,17 @@ export function WorkspacePage() {
   const presetSelectionOptions = useMemo(() => selectionOptions.filter((option) => option.source === "preset" && option.preset), [selectionOptions])
   const filteredTemplates = useMemo(() => filterRelatedTemplates(selectedModel, catalog?.templates ?? []), [catalog?.templates, selectedModel])
   const filteredBenchmarks = useMemo(() => filterRelatedBenchmarks(selectedModel, catalog?.benchmarks ?? []), [catalog?.benchmarks, selectedModel])
+  const categorizedTemplates = useMemo(
+    () => ({
+      algorithms: (catalog?.templates ?? []).filter((template) => template.kind === "algorithm"),
+      protocols: (catalog?.templates ?? []).filter((template) => template.kind === "protocol"),
+    }),
+    [catalog?.templates],
+  )
+  const visibleTemplates = useMemo(
+    () => (catalog?.templates ?? []).filter((template) => matchesTemplateFilter(template, templateSearch, templateCategoryFilter)),
+    [catalog?.templates, templateCategoryFilter, templateSearch],
+  )
   const templateById = useMemo(() => {
     const entries = (catalog?.templates ?? []).map((template) => [template.id, template] as const)
     return new Map(entries)
@@ -346,14 +369,22 @@ export function WorkspacePage() {
   }, [navigate, searchParams, templateById])
 
   useEffect(() => {
-    const injectedState = location.state as { circuit?: string; format?: "openqasm" | "qunetsim" | "custom" } | null
+    const injectedState = location.state as {
+      circuit?: string
+      format?: "openqasm" | "qunetsim" | "custom"
+      category?: "algorithm" | "protocol" | null
+      templateId?: string
+    } | null
     if (!injectedState?.circuit) return
 
     injectedSourceLockRef.current = injectedState.circuit
     clearActiveTemplateContext(
       injectedState.format ?? "custom",
-      injectedState.format === "qunetsim" ? "protocol" : injectedState.format === "openqasm" ? "algorithm" : null,
+      injectedState.category ?? (injectedState.format === "qunetsim" ? "protocol" : injectedState.format === "openqasm" ? "algorithm" : null),
     )
+    if (injectedState.templateId) {
+      setSelectedModelValue(`template:${injectedState.templateId}`)
+    }
     setSource(injectedState.circuit)
     navigate("/workspace", { replace: true, state: null })
   }, [clearActiveTemplateContext, location.state, navigate])
@@ -531,12 +562,14 @@ export function WorkspacePage() {
     }
 
     if (option.source === "template" && option.template) {
+      setTemplateDrawerOpen(false)
       loadTemplate(option.template).then(hydrated => setSource(hydrated))
       return
     }
 
     const templateMatch = findRelatedTemplate(option, catalog?.templates ?? [])
     if (templateMatch) {
+      setTemplateDrawerOpen(false)
       loadTemplate(templateMatch).then(hydrated => setSource(hydrated))
       return
     }
@@ -624,6 +657,9 @@ export function WorkspacePage() {
   return (
     <div style={pageShellStyle}>
       <nav style={topNavStyle}>
+        <button type="button" style={navHamburgerStyle} onClick={() => setTemplateDrawerOpen(true)} aria-label="Open workspace menu">
+          <Menu size={18} />
+        </button>
         <div style={navControlsStyle}>
           <Link to="/" style={headerLinkButtonStyle}>
             <House size={14} />
@@ -661,6 +697,85 @@ export function WorkspacePage() {
           </div>
         </div>
       </nav>
+
+      <Dialog.Root open={templateDrawerOpen} onOpenChange={setTemplateDrawerOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay style={modalOverlayStyle} />
+          <Dialog.Content style={templateDrawerStyle}>
+            <div style={templateDrawerHeaderStyle}>
+              <div>
+                <div style={eyebrowStyle}>WORKSPACE MENU</div>
+                <Dialog.Title style={{ fontSize: 20, marginBottom: 4 }}>Algorithms and protocols</Dialog.Title>
+                <Dialog.Description style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  Change templates without leaving the workspace.
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <button type="button" style={drawerCloseButtonStyle} aria-label="Close workspace menu">
+                  <X size={16} />
+                </button>
+              </Dialog.Close>
+            </div>
+
+            <div style={templateSearchShellStyle}>
+              <Search size={15} style={{ color: "var(--text-muted)" }} />
+              <input
+                value={templateSearch}
+                onChange={(event) => setTemplateSearch(event.target.value)}
+                placeholder="Search templates"
+                style={templateSearchInputStyle}
+              />
+            </div>
+
+            <div style={drawerFilterRailStyle}>
+              {(["all", "algorithm", "protocol"] as const).map((filterValue) => (
+                <button
+                  key={filterValue}
+                  type="button"
+                  onClick={() => setTemplateCategoryFilter(filterValue)}
+                  style={{
+                    ...drawerFilterButtonStyle,
+                    borderColor: templateCategoryFilter === filterValue ? "var(--accent-cyan)" : "var(--border)",
+                    background: templateCategoryFilter === filterValue ? "var(--bg-active)" : "transparent",
+                    color: templateCategoryFilter === filterValue ? "var(--text-primary)" : "var(--text-secondary)",
+                  }}
+                >
+                  {filterValue === "all" ? "All" : filterValue === "algorithm" ? "Algorithms" : "Protocols"}
+                </button>
+              ))}
+            </div>
+
+            <div style={workspaceCategoryBadgeRailStyle}>
+              <span style={workspaceCategoryBadgeStyle}>{categorizedTemplates.algorithms.length} algorithms</span>
+              <span style={workspaceCategoryBadgeStyle}>{categorizedTemplates.protocols.length} protocols</span>
+            </div>
+
+            <div style={templateDrawerListStyle}>
+              {visibleTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  style={{
+                    ...drawerTemplateButtonStyle,
+                    borderColor: selectedModelValue === `template:${template.id}` ? "var(--accent-cyan)" : "var(--border)",
+                  }}
+                  onClick={() => applyTemplateById(template.id)}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                    <div>
+                      <div style={drawerTemplateMetaStyle}>{template.kind}</div>
+                      <strong>{template.title}</strong>
+                    </div>
+                    <span style={drawerTemplateIdStyle}>{template.id}</span>
+                  </div>
+                  <div style={drawerTemplateBodyStyle}>{template.description}</div>
+                </button>
+              ))}
+              {visibleTemplates.length === 0 && <div style={drawerEmptyStateStyle}>No templates matched this filter.</div>}
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       <Dialog.Root open={benchmarkModalOpen} onOpenChange={setBenchmarkModalOpen}>
         <Dialog.Portal>
@@ -759,6 +874,8 @@ export function WorkspacePage() {
                 <WorkspaceCircuitBuilder canSync={canSyncCircuit} />
               </div>
               <div style={terminalPaneStyle}>
+                <AlgorithmSettingsPanel onUpdateSource={setSource} validationFailed={validationFailed} />
+
                 <div style={editorHeaderStyle}>
                   <select
                     value={engine}
@@ -778,13 +895,6 @@ export function WorkspacePage() {
                       <MoreHorizontal size={14} />
                     </button>
                   </div>
-                </div>
-                <div style={syntaxChipRailStyle}>
-                  {QUICK_SYNTAX.map((line) => (
-                    <button key={line} type="button" onClick={() => setSource((current) => `${current.trimEnd()}\n${line}`)} style={syntaxChipStyle}>
-                      {line}
-                    </button>
-                  ))}
                 </div>
                 <div style={{ borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid #2a3248" }}>
                   <Editor
@@ -824,8 +934,6 @@ export function WorkspacePage() {
         <div className="workspace-resizer" onPointerDown={handleResizeStart} title="Resize inspector" />
 
         <aside className="workspace-pane workspace-right-pane" style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <AlgorithmSettingsPanel onUpdateSource={setSource} validationFailed={validationFailed} />
-
           <SectionCard
             title="Inspector"
             subtitle="Inspect state, Bloch vectors, and analysis from here."
@@ -1032,22 +1140,6 @@ const navHamburgerStyle: CSSProperties = {
   justifyContent: "center",
 }
 
-const navWorkspaceLabelStyle: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 700,
-  fontFamily: "var(--font-mono)",
-  color: "var(--text-primary)",
-  letterSpacing: "0.08em",
-  whiteSpace: "nowrap",
-}
-
-const navCenterStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  display: "flex",
-  justifyContent: "center",
-}
-
 const navTitleButtonStyle: CSSProperties = {
   maxWidth: "min(58vw, 640px)",
   display: "inline-flex",
@@ -1213,13 +1305,6 @@ const editorHeaderIconButtonStyle: CSSProperties = {
   justifyContent: "center",
 }
 
-const syntaxChipRailStyle: CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  marginBottom: 12,
-}
-
 const sectionCardStyle: CSSProperties = {
   borderRadius: "var(--radius-lg)",
   border: "1px solid var(--border)",
@@ -1284,14 +1369,137 @@ const benchmarkModalStyle: CSSProperties = {
   flexDirection: "column",
 }
 
-const syntaxChipStyle: CSSProperties = {
+const templateDrawerStyle: CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  bottom: 0,
+  width: "min(420px, 92vw)",
+  zIndex: 55,
+  borderRight: "1px solid var(--border)",
+  background: "linear-gradient(180deg, var(--bg-panel), var(--bg-elevated))",
+  padding: 16,
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+  boxShadow: "var(--shadow-card)",
+}
+
+const templateDrawerHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 12,
+}
+
+const drawerCloseButtonStyle: CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  color: "var(--text-primary)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+}
+
+const workspaceCategoryBadgeRailStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+}
+
+const workspaceCategoryBadgeStyle: CSSProperties = {
   borderRadius: 999,
-  border: "1px solid #2f3a53",
-  background: "#171d2c",
-  color: "#a5b4d6",
+  border: "1px solid var(--border)",
   padding: "6px 10px",
+  background: "var(--bg-card)",
+  color: "var(--text-secondary)",
   fontSize: 11,
   fontFamily: "var(--font-mono)",
+}
+
+const templateSearchShellStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  padding: "0 12px",
+  minHeight: 42,
+}
+
+const templateSearchInputStyle: CSSProperties = {
+  flex: 1,
+  border: "none",
+  background: "transparent",
+  color: "var(--text-primary)",
+  outline: "none",
+  fontSize: 13,
+}
+
+const drawerFilterRailStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+}
+
+const drawerFilterButtonStyle: CSSProperties = {
+  borderRadius: 999,
+  border: "1px solid var(--border)",
+  padding: "8px 12px",
+  fontSize: 12,
+  fontWeight: 700,
+  background: "transparent",
+}
+
+const templateDrawerListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+  overflowY: "auto",
+  paddingRight: 4,
+}
+
+const drawerTemplateButtonStyle: CSSProperties = {
+  textAlign: "left",
+  borderRadius: "var(--radius-lg)",
+  border: "1px solid var(--border)",
+  background: "var(--bg-card)",
+  padding: 14,
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+}
+
+const drawerTemplateMetaStyle: CSSProperties = {
+  fontSize: 11,
+  color: "var(--text-muted)",
+  fontFamily: "var(--font-mono)",
+  textTransform: "uppercase",
+  marginBottom: 4,
+}
+
+const drawerTemplateIdStyle: CSSProperties = {
+  fontSize: 11,
+  color: "var(--text-muted)",
+  fontFamily: "var(--font-mono)",
+}
+
+const drawerTemplateBodyStyle: CSSProperties = {
+  color: "var(--text-secondary)",
+  lineHeight: 1.6,
+  fontSize: 13,
+}
+
+const drawerEmptyStateStyle: CSSProperties = {
+  borderRadius: "var(--radius-lg)",
+  border: "1px dashed var(--border)",
+  padding: 18,
+  color: "var(--text-secondary)",
+  textAlign: "center",
 }
 
 const editorStyle: CSSProperties = {

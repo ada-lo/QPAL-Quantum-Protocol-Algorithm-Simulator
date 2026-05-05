@@ -48,6 +48,7 @@ export interface TopicTrack {
 const topicEntries = algorithms as TopicCatalogEntry[]
 
 const topicById = new Map(topicEntries.map((topic) => [topic.id, topic] as const))
+const topicByCatalogKey = new Map(topicEntries.map((topic) => [topic.catalog_key, topic] as const))
 
 const ALGORITHM_TOPIC_IDS = [
   "deutsch",
@@ -109,6 +110,10 @@ export function getTopicTracks() {
 
 export function getTopicById(id: string) {
   return topicById.get(id) ?? null
+}
+
+export function getTopicByCatalogKey(catalogKey: string) {
+  return topicByCatalogKey.get(catalogKey) ?? null
 }
 
 export function getTopicLabel(id: string) {

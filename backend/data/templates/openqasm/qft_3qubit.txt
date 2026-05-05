@@ -1,0 +1,32 @@
+// ============================================================
+// Quantum Fourier Transform — OpenQASM 3.0
+// Matches the custom pseudocode logic for the 3-qubit example.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+qubit[3] q;
+bit[3] c;
+
+// Example input |100>
+x q[0];
+
+// QFT on q0
+h q[0];
+cp(pi / 2) q[1], q[0];
+cp(pi / 4) q[2], q[0];
+
+// QFT on q1
+h q[1];
+cp(pi / 2) q[2], q[1];
+
+// QFT on q2
+h q[2];
+
+// Bit-reversal swap
+swap q[0], q[2];
+
+// Readout
+c[0] = measure q[0];
+c[1] = measure q[1];
+c[2] = measure q[2];

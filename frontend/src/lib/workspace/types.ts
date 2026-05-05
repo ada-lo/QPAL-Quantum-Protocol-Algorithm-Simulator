@@ -133,6 +133,7 @@ export interface WorkspaceTemplateParameter {
   label: string
   type: string
   default: any
+  options?: { label: string; value: string }[]
 }
 
 export interface WorkspaceTemplate {

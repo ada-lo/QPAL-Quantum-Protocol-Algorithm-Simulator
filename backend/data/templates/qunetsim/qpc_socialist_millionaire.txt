@@ -1,0 +1,63 @@
+# ============================================================
+# Quantum Private Comparison (Socialist Millionaire) — QuNetSim
+# Matches the custom pseudocode logic: Alice and Bob encode secret bits for comparison.
+# ============================================================
+from qunetsim.components import Host, Network
+from qunetsim.objects import Qubit
+import time
+
+
+def main():
+    network = Network.get_instance()
+    network.start(["Alice", "Bob", "TP"])
+
+    alice = Host("Alice")
+    alice.add_connection("TP")
+    alice.start()
+
+    bob = Host("Bob")
+    bob.add_connection("TP")
+    bob.start()
+
+    tp = Host("TP")
+    tp.add_connection("Alice")
+    tp.add_connection("Bob")
+    tp.start()
+
+    network.add_host(alice)
+    network.add_host(bob)
+    network.add_host(tp)
+
+    alice_secret = 1
+    bob_secret = 1
+
+    q_alice = Qubit(alice)
+    q_bob = Qubit(bob)
+
+    if alice_secret == 1:
+        q_alice.X()
+    if bob_secret == 1:
+        q_bob.X()
+
+    alice.send_qubit("TP", q_alice, await_ack=True)
+    bob.send_qubit("TP", q_bob, await_ack=True)
+
+    time.sleep(1)
+    recv_a = tp.get_qubit("Alice", wait=5)
+    recv_b = tp.get_qubit("Bob", wait=5)
+
+    if recv_a is None or recv_b is None:
+        print("[TP] Comparison failed: missing qubit.")
+        network.stop(stop_hosts=True)
+        return
+
+    a_bit = recv_a.measure()
+    b_bit = recv_b.measure()
+    print(f"[TP] Alice bit: {a_bit}, Bob bit: {b_bit}")
+    print(f"[TP] Secrets are {'equal' if a_bit == b_bit else 'different'}.")
+
+    network.stop(stop_hosts=True)
+
+
+if __name__ == "__main__":
+    main()

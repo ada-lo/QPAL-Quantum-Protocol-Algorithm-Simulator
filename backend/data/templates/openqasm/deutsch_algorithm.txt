@@ -16,10 +16,8 @@ x q[1];
 h q[0];
 h q[1];
 
-// 4. Oracle — Balanced function: f(x) = x (CNOT encodes it)
-//    Swap to cx q[0], q[1]; for balanced
-//    Comment out cx for constant f(x) = 0
-cx q[0], q[1];
+// 4. Oracle — {{oracle_label}}
+{{oracle_gates}}
 
 // 5. Apply Hadamard to input qubit
 h q[0];

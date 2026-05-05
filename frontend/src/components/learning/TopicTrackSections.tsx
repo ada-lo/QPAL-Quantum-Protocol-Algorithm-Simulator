@@ -38,7 +38,7 @@ export function TopicTrackSections({ basePath }: TopicTrackSectionsProps) {
   return (
     <>
       {tracks.map((track) => (
-        <section key={track.id} style={sectionStyle}>
+        <section key={track.id} id={track.id} style={sectionStyle}>
           <div style={sectionHeaderStyle}>
             <div style={eyebrowStyle}>{track.id.toUpperCase()}</div>
             <h2 style={sectionTitleStyle}>{track.title}</h2>

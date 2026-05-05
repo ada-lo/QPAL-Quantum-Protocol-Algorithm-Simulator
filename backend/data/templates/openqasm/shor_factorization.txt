@@ -1,0 +1,43 @@
+// ============================================================
+// Shor's Algorithm (Simplified Period Finding) — OpenQASM 3.0
+// Matches the custom pseudocode logic for factoring 15 with a=7.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+qubit[5] q;
+bit[4] c;
+
+// q[0..3] counting register, q[4] target register
+reset q[0];
+reset q[1];
+reset q[2];
+reset q[3];
+reset q[4];
+
+// Superpose counting register
+h q[0];
+h q[1];
+h q[2];
+h q[3];
+
+// Prepare target register |1>
+x q[4];
+
+// Simplified modular exponentiation oracle
+cx q[3], q[4];
+cz q[2], q[4];
+
+// Simplified inverse QFT
+swap q[0], q[3];
+h q[0];
+cp(-pi / 8) q[1], q[0];
+h q[1];
+h q[2];
+h q[3];
+
+// Readout
+c[0] = measure q[0];
+c[1] = measure q[1];
+c[2] = measure q[2];
+c[3] = measure q[3];

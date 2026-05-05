@@ -4,6 +4,8 @@ import type { WorkspaceSystemCapabilities, WorkspaceTemplate, WorkspaceSimulatio
 import { languagePresets, PRESET_UNAVAILABLE } from "@/utils/languagePresets"
 import { simulateWorkspaceProgram } from "@/lib/workspace/api"
 import { getAuthToken } from "@/lib/auth/authClient"
+import { getTopicByCatalogKey } from "@/lib/learning/topicCatalog"
+import { buildInitialInputValues, buildPreviewCode } from "@/lib/learning/topicTemplateUtils"
 
 export type NoiseModel = 'ideal' | 'ibm_eagle' | 'ibm_osprey'
 export type ComputeTarget = 'cpu' | 'gpu'
@@ -72,6 +74,48 @@ export interface SimState {
   clearActiveTemplateContext: (engine: 'custom' | 'openqasm' | 'qunetsim', category: 'algorithm' | 'protocol' | null) => void
 
   reset: () => void
+}
+
+function hydrateTemplateCode(template: WorkspaceTemplate | null, baseCode: string, params: Record<string, any>) {
+  const topic = template ? getTopicByCatalogKey(template.id) : null
+  if (topic?.inputs?.length) {
+    return buildPreviewCode(topic, params, template)
+  }
+
+  let hydrated = baseCode
+  for (const [k, v] of Object.entries(params)) {
+    hydrated = hydrated.replace(new RegExp(`\\{\\{${k}\\}\\}`, "g"), String(v))
+  }
+
+  if (template?.id === "deutsch" && params.oracle_mode !== undefined) {
+    const oracleMode = String(params.oracle_mode)
+    const oracleVariants: Record<string, { label: string; gates: string }> = {
+      "constant-0": {
+        label: "Oracle: f(x)=0",
+        gates: baseCode.includes("OPENQASM 3.0;") ? "// No oracle action needed" : "NOTE No oracle action needed",
+      },
+      "constant-1": {
+        label: "Oracle: f(x)=1",
+        gates: baseCode.includes("OPENQASM 3.0;") ? "x q[1];" : "X q1",
+      },
+      balanced: {
+        label: "Oracle: balanced f(x)=x",
+        gates: baseCode.includes("OPENQASM 3.0;") ? "cx q[0], q[1];" : "CNOT q0 q1",
+      },
+    }
+    const oracleConfig = oracleVariants[oracleMode] ?? oracleVariants.balanced
+    hydrated = hydrated.replace(/\{\{oracle_label\}\}/g, oracleConfig.label)
+    hydrated = hydrated.replace(/\{\{oracle_gates\}\}/g, oracleConfig.gates)
+  }
+
+  if (params["hidden_string"] !== undefined) {
+    const s = String(params["hidden_string"])
+    const n = s.length
+    const cnots = s.split("").map((bit, idx) => bit === "1" ? `CNOT q${idx} q${n}` : "").filter(Boolean).join("\n")
+    hydrated = hydrated.replace(/\{\{oracle_gates\}\}/g, cnots || "NOTE zero string")
+  }
+
+  return hydrated
 }
 
 export const useSimStore = create<SimState>((set, get) => ({
@@ -208,8 +252,11 @@ export const useSimStore = create<SimState>((set, get) => ({
   setOpenForWalkthrough: (v) => set({ openForWalkthrough: v }),
 
   loadTemplate: async (template) => {
-    const params: Record<string, any> = {}
-    if (template.parameters) {
+    const topic = getTopicByCatalogKey(template.id)
+    const params: Record<string, any> = topic?.inputs?.length
+      ? buildInitialInputValues(topic)
+      : {}
+    if (!topic?.inputs?.length && template.parameters) {
       template.parameters.forEach(p => { params[p.name] = p.default })
     }
     const category: 'algorithm' | 'protocol' = template.kind === 'protocol' ? 'protocol' : 'algorithm'
@@ -260,40 +307,19 @@ export const useSimStore = create<SimState>((set, get) => ({
       return presetCode
     }
 
-    let hydrated = template.code
-    for (const [k, v] of Object.entries(params)) {
-      hydrated = hydrated.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v))
-    }
-    if (params['hidden_string'] !== undefined) {
-      const s = String(params['hidden_string'])
-      const n = s.length
-      const cnots = s.split('').map((bit, idx) => bit === '1' ? `CNOT q${idx} q${n}` : '').filter(Boolean).join('\n')
-      hydrated = hydrated.replace(/\{\{oracle_gates\}\}/g, cnots || 'NOTE zero string')
-    }
+    const hydrated = hydrateTemplateCode(template, template.code, params)
     set({ activeTemplateBaseCode: hydrated })
     return hydrated
   },
 
   updateParameter: (key, value) => {
-    const { activeTemplateBaseCode, templateParams } = get()
+    const { activeTemplate, activeTemplateBaseCode, templateParams } = get()
     if (!activeTemplateBaseCode) return null
 
     const newParams = { ...templateParams, [key]: value }
     set({ templateParams: newParams })
 
-    let hydrated = activeTemplateBaseCode
-    for (const [k, v] of Object.entries(newParams)) {
-      hydrated = hydrated.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v))
-    }
-
-    if (newParams['hidden_string'] !== undefined) {
-      const s = String(newParams['hidden_string'])
-      const n = s.length
-      const cnots = s.split('').map((bit, idx) => bit === '1' ? `CNOT q${idx} q${n}` : '').filter(Boolean).join('\n')
-      hydrated = hydrated.replace(/\{\{oracle_gates\}\}/g, cnots || 'NOTE zero string')
-    }
-
-    return hydrated
+    return hydrateTemplateCode(activeTemplate, activeTemplateBaseCode, newParams)
   },
 
   clearActiveTemplateContext: (engine, category) => set({

@@ -7,8 +7,8 @@ LABEL Apply Hadamard to both qubits
 H q0
 H q1
 
-LABEL Oracle: balanced f(x) = x (CNOT encodes it)
-CNOT q0 q1
+LABEL {{oracle_label}}
+{{oracle_gates}}
 
 LABEL Final Hadamard on query qubit
 H q0

@@ -1,0 +1,35 @@
+// ============================================================
+// Quantum Phase Estimation — OpenQASM 3.0
+// Matches the custom pseudocode logic: 2 estimation qubits, T-gate phase.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+qubit[3] q;
+bit[2] c;
+
+// q[0], q[1] = estimation register, q[2] = target eigenstate
+reset q[0];
+reset q[1];
+reset q[2];
+
+// Prepare eigenstate |1> on target
+x q[2];
+
+// Hadamard estimation qubits
+h q[0];
+h q[1];
+
+// Controlled-U^1 and Controlled-U^2
+cp(pi / 4) q[1], q[2];
+cp(pi / 2) q[0], q[2];
+
+// Inverse QFT on estimation qubits
+swap q[0], q[1];
+h q[0];
+cp(-pi / 4) q[1], q[0];
+h q[1];
+
+// Readout
+c[0] = measure q[0];
+c[1] = measure q[1];

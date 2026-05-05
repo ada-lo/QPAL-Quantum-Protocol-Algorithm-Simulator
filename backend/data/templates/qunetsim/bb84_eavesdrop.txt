@@ -1,0 +1,62 @@
+# ============================================================
+# BB84 With Eve — QuNetSim
+# Matches the custom pseudocode flow: prepare, send, intercept, resend.
+# ============================================================
+from qunetsim.components import Host, Network
+from qunetsim.objects import Qubit
+import time
+
+
+def main():
+    network = Network.get_instance()
+    network.start(["Alice", "Bob", "Eve"])
+
+    alice = Host("Alice")
+    alice.add_connection("Eve")
+    alice.start()
+
+    eve = Host("Eve")
+    eve.add_connection("Alice")
+    eve.add_connection("Bob")
+    eve.start()
+
+    bob = Host("Bob")
+    bob.add_connection("Eve")
+    bob.start()
+
+    network.add_host(alice)
+    network.add_host(eve)
+    network.add_host(bob)
+
+    print("[Alice] Preparing photon in |+> basis state")
+    q = Qubit(alice)
+    q.H()
+    alice.send_qubit("Eve", q, await_ack=True)
+
+    time.sleep(1)
+    intercepted = eve.get_qubit("Alice", wait=5)
+    if intercepted is None:
+        print("[Eve] No qubit intercepted.")
+        network.stop(stop_hosts=True)
+        return
+
+    eve_result = intercepted.measure()
+    print(f"[Eve] Intercepted and measured qubit: {eve_result}")
+
+    resent = Qubit(eve)
+    if eve_result == 1:
+      resent.X()
+    eve.send_qubit("Bob", resent, await_ack=True)
+
+    time.sleep(1)
+    received = bob.get_qubit("Eve", wait=5)
+    if received is not None:
+        print(f"[Bob] Measured resent qubit: {received.measure()}")
+    else:
+        print("[Bob] No qubit received.")
+
+    network.stop(stop_hosts=True)
+
+
+if __name__ == "__main__":
+    main()

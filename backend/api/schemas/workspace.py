@@ -145,6 +145,7 @@ class WorkspaceTemplateParameter(BaseModel):
     label: str
     type: str
     default: Any
+    options: list[dict[str, str]] | None = None
 
 
 class WorkspaceTemplate(BaseModel):

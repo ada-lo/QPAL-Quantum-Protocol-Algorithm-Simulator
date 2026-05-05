@@ -1,4 +1,4 @@
-import { Cpu, RefreshCw, Settings2 } from "lucide-react"
+import { Cpu, RefreshCw } from "lucide-react"
 import type { CSSProperties } from "react"
 
 import type {
@@ -10,6 +10,7 @@ import type {
 } from "@/lib/workspace/types"
 import { WorkspaceBlochPanel } from "./WorkspaceBlochPanel"
 import { useSimStore } from "@/store/simStore"
+import { getTopicByCatalogKey } from "@/lib/learning/topicCatalog"
 
 export interface WorkspaceInspectorContext {
   title: string
@@ -27,54 +28,72 @@ export function AlgorithmSettingsPanel({
   const activeTemplate = useSimStore((s) => s.activeTemplate)
   const templateParams = useSimStore((s) => s.templateParams)
   const updateParameter = useSimStore((s) => s.updateParameter)
+  const learnerTopic = activeTemplate ? getTopicByCatalogKey(activeTemplate.id) : null
+  const configuredInputs = learnerTopic?.inputs?.length
+    ? learnerTopic.inputs.map((input) => ({
+        name: input.id,
+        label: input.label,
+        type: input.type === "dropdown" ? "select" : input.type,
+        default: input.defaultValue,
+        options: input.options,
+      }))
+    : (activeTemplate?.parameters ?? [])
 
-  if (!activeTemplate?.parameters || activeTemplate.parameters.length === 0) return null
+  if (!configuredInputs.length) return null
 
   return (
-    <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-panel)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-        <Settings2 size={16} color="var(--accent-cyan)" />
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.08em", color: "var(--accent-cyan)", fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
-          Algorithm Settings
-        </span>
+    <div style={settingsPanelShellStyle}>
+      <div style={settingsHeaderStyle}>
+        <div style={eyebrowStyle}>CONFIGURE CIRCUIT</div>
+        <div style={settingsMetaStyle}>
+          {activeTemplate.kind === "protocol" ? "Protocol template inputs" : "Algorithm template inputs"}
+        </div>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-        {activeTemplate.parameters.map((param) => (
-          <div key={param.name} style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 200, flex: 1 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+      <div style={settingsGridStyle}>
+        {configuredInputs.map((param) => (
+          <div key={param.name} style={settingsFieldStyle}>
+            <label style={settingsLabelStyle}>
               {param.label}
             </label>
-            <input
-              type={param.type === "number" ? "number" : "text"}
-              value={templateParams[param.name] ?? param.default}
-              onChange={(e) => {
-                const val = param.type === "number" ? Number(e.target.value) : e.target.value
-                const hydratedCode = updateParameter(param.name, val)
-                if (hydratedCode) onUpdateSource(hydratedCode)
-              }}
-              style={{
-                background: "var(--bg-surface)", 
-                border: "1px solid",
-                borderColor: validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
-                  ? "var(--accent-red)"
-                  : "var(--border)",
-                borderRadius: "var(--radius-md)", padding: "10px 14px", 
-                color: "var(--text-primary)", fontSize: 13, fontFamily: "var(--font-mono)",
-                transition: "border-color 0.15s, box-shadow 0.15s"
-              }}
-              onFocus={(e) => {
-                const hasError = validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
-                e.target.style.borderColor = hasError ? "var(--accent-red)" : "var(--accent-cyan)"
-                e.target.style.boxShadow = hasError
-                  ? "0 0 0 2px rgba(248, 113, 113, 0.15)"
-                  : "var(--ring-cyan)"
-              }}
-              onBlur={(e) => {
-                const hasError = validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
-                e.target.style.borderColor = hasError ? "var(--accent-red)" : "var(--border)"
-                e.target.style.boxShadow = "none"
-              }}
-            />
+            {param.options?.length ? (
+              <select
+                value={String(templateParams[param.name] ?? param.default)}
+                onChange={(e) => {
+                  const hydratedCode = updateParameter(param.name, e.target.value)
+                  if (hydratedCode) onUpdateSource(hydratedCode)
+                }}
+                style={getSettingsControlStyle(validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null))}
+              >
+                {param.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={param.type === "number" ? "number" : "text"}
+                value={templateParams[param.name] ?? param.default}
+                onChange={(e) => {
+                  const val = param.type === "number" ? Number(e.target.value) : e.target.value
+                  const hydratedCode = updateParameter(param.name, val)
+                  if (hydratedCode) onUpdateSource(hydratedCode)
+                }}
+                style={getSettingsControlStyle(validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null))}
+                onFocus={(e) => {
+                  const hasError = validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
+                  e.target.style.borderColor = hasError ? "var(--accent-red)" : "var(--accent-cyan)"
+                  e.target.style.boxShadow = hasError
+                    ? "0 0 0 2px rgba(248, 113, 113, 0.15)"
+                    : "var(--ring-cyan)"
+                }}
+                onBlur={(e) => {
+                  const hasError = validationFailed && (templateParams[param.name] === "" || templateParams[param.name] == null)
+                  e.target.style.borderColor = hasError ? "var(--accent-red)" : "var(--border)"
+                  e.target.style.boxShadow = "none"
+                }}
+              />
+            )}
           </div>
         ))}
       </div>
@@ -342,6 +361,45 @@ const supportPanelStyle: CSSProperties = {
   minHeight: 0,
 }
 
+const settingsPanelShellStyle: CSSProperties = {
+  padding: "16px 20px",
+  borderBottom: "1px solid var(--border)",
+  background: "var(--bg-panel)",
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+}
+
+const settingsHeaderStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+}
+
+const settingsMetaStyle: CSSProperties = {
+  color: "var(--text-secondary)",
+  fontSize: 13,
+  lineHeight: 1.6,
+}
+
+const settingsGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+}
+
+const settingsFieldStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+}
+
+const settingsLabelStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: "var(--text-secondary)",
+}
+
 const miniCardStyle: CSSProperties = {
   borderRadius: "var(--radius-md)",
   border: "1px solid var(--border)",
@@ -460,4 +518,19 @@ export function SimulationOutputPanel() {
       </div>
     </div>
   )
+}
+
+function getSettingsControlStyle(hasError: boolean): CSSProperties {
+  return {
+    background: "var(--bg-surface)",
+    border: "1px solid",
+    borderColor: hasError ? "var(--accent-red)" : "var(--border)",
+    borderRadius: "var(--radius-md)",
+    padding: "10px 14px",
+    color: "var(--text-primary)",
+    fontSize: 13,
+    fontFamily: "var(--font-mono)",
+    transition: "border-color 0.15s, box-shadow 0.15s",
+    minHeight: 44,
+  }
 }

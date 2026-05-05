@@ -1,0 +1,37 @@
+// ============================================================
+// QEC: 3-Qubit Repetition Code — OpenQASM 3.0
+// Matches the custom pseudocode logic for bit-flip protection.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+qubit[5] q;
+bit[2] syndrome;
+bit[1] result;
+
+// q[0] logical, q[1..2] repetition qubits, q[3..4] syndrome ancillas
+h q[0];
+
+// Encode logical qubit
+cx q[0], q[1];
+cx q[0], q[2];
+
+// Simulate bit-flip error on q[1]
+x q[1];
+
+// Parity checks
+cx q[0], q[3];
+cx q[1], q[3];
+cx q[1], q[4];
+cx q[2], q[4];
+
+// Measure syndromes
+syndrome[0] = measure q[3];
+syndrome[1] = measure q[4];
+
+// Decode (correction step omitted, matching simplified custom flow)
+cx q[0], q[1];
+cx q[0], q[2];
+
+// Readout logical qubit
+result[0] = measure q[0];

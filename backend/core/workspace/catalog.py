@@ -215,6 +215,19 @@ TEMPLATES = [
         kind="algorithm",
         description="Decides if a 1-bit function f is constant or balanced with a single query.",
         tags=["deutsch", "foundational", "oracle", "difficulty:beginner"],
+        parameters=[
+            WorkspaceTemplateParameter(
+                name="oracle_mode",
+                label="f(x)",
+                type="select",
+                default="balanced",
+                options=[
+                    {"label": "constant-0", "value": "constant-0"},
+                    {"label": "constant-1", "value": "constant-1"},
+                    {"label": "balanced", "value": "balanced"},
+                ],
+            )
+        ],
         code="\n".join([
             "NOTE Deutsch Algorithm — constant vs balanced oracle",
             "",
@@ -225,8 +238,8 @@ TEMPLATES = [
             "H q0",
             "H q1",
             "",
-            "LABEL Oracle: balanced f(x) = x (CNOT encodes it)",
-            "CNOT q0 q1",
+            "LABEL {{oracle_label}}",
+            "{{oracle_gates}}",
             "",
             "LABEL Final Hadamard on query qubit",
             "H q0",

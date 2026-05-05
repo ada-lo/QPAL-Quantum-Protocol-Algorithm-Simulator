@@ -134,12 +134,10 @@ def _noise_model_from_label(label: str, warnings: list[str] | None = None):
 
     from qiskit_aer.noise import NoiseModel, depolarizing_error
 
-    label_lower = label.lower()
-
-    if label_lower in ("basic", "depolarizing", "noise"):
+    def build_depolarizing_noise_model(error_rate_1q: float, error_rate_2q: float, note: str):
         noise_model = NoiseModel()
-        error_1q = depolarizing_error(0.01, 1)
-        error_2q = depolarizing_error(0.02, 2)
+        error_1q = depolarizing_error(error_rate_1q, 1)
+        error_2q = depolarizing_error(error_rate_2q, 2)
 
         for gate in ["u1", "u2", "u3", "rx", "ry", "rz", "h", "x", "y", "z", "s", "sdg", "t", "tdg"]:
             noise_model.add_quantum_error(error_1q, gate, [0])
@@ -147,24 +145,40 @@ def _noise_model_from_label(label: str, warnings: list[str] | None = None):
             noise_model.add_all_qubit_quantum_error(error_2q, gate)
 
         if warnings is not None:
-            warnings.append("Basic depolarizing noise model applied (1% 1q, 2% 2q)")
+            warnings.append(note)
         return noise_model
+
+    label_lower = label.lower()
+
+    if label_lower in ("basic", "depolarizing", "noise"):
+        return build_depolarizing_noise_model(
+            0.01,
+            0.02,
+            "Basic depolarizing noise model applied (1% 1q, 2% 2q)",
+        )
+
+    if label_lower == "ibm_eagle":
+        return build_depolarizing_noise_model(
+            0.0025,
+            0.015,
+            "IBM Eagle-inspired noise model applied (0.25% 1q, 1.5% 2q depolarizing)",
+        )
+
+    if label_lower == "ibm_osprey":
+        return build_depolarizing_noise_model(
+            0.003,
+            0.02,
+            "IBM Osprey-inspired noise model applied (0.3% 1q, 2.0% 2q depolarizing)",
+        )
 
     try:
         spec = json.loads(label)
         error_rate = spec.get("error_rate", 0.01)
-        noise_model = NoiseModel()
-        error_1q = depolarizing_error(error_rate, 1)
-        error_2q = depolarizing_error(2 * error_rate, 2)
-
-        for gate in ["u1", "u2", "u3", "rx", "ry", "rz", "h", "x", "y", "z", "s", "sdg", "t", "tdg"]:
-            noise_model.add_quantum_error(error_1q, gate, [0])
-        for gate in ["cx", "cz", "swap", "iswap"]:
-            noise_model.add_all_qubit_quantum_error(error_2q, gate)
-
-        if warnings is not None:
-            warnings.append(f"Custom noise model: {error_rate:.1%} 1q, {2 * error_rate:.1%} 2q depolarizing")
-        return noise_model
+        return build_depolarizing_noise_model(
+            error_rate,
+            2 * error_rate,
+            f"Custom noise model: {error_rate:.1%} 1q, {2 * error_rate:.1%} 2q depolarizing",
+        )
     except (json.JSONDecodeError, TypeError, KeyError) as exc:
         if warnings is not None:
             warnings.append(f"Could not parse custom noise_model: '{label}' ({exc}), using no noise")

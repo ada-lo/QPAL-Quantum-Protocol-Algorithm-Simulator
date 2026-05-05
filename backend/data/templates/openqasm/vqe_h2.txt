@@ -1,0 +1,27 @@
+// ============================================================
+// VQE Ansatz for H2 — OpenQASM 3.0
+// Matches the custom pseudocode logic: hardware-efficient ansatz only.
+// ============================================================
+OPENQASM 3.0;
+include "stdgates.inc";
+
+qubit[2] q;
+bit[2] c;
+
+reset q[0];
+reset q[1];
+
+// Ansatz layer 1
+ry(0.5) q[0];
+ry(-1.2) q[1];
+
+// Entangling layer
+cx q[0], q[1];
+
+// Ansatz layer 2
+ry(0.8) q[0];
+ry(0.3) q[1];
+
+// Readout for expectation estimation
+c[0] = measure q[0];
+c[1] = measure q[1];
