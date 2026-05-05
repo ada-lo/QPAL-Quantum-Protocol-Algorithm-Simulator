@@ -103,7 +103,7 @@ class BaseQuantumEngine(ABC):
         )
 
         # ── Schema selection ───────────────────────────────────────────
-        is_protocol = bool(_actors) or bool(_transmissions)
+        is_protocol = bool(_actors) or bool(_transmissions) or bool(_measurements)
 
         if is_protocol:
             return WorkspaceProtocolResponse(

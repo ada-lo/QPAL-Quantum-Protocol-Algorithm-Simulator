@@ -963,7 +963,7 @@ export function WorkspacePage() {
             }
           >
             {activeInspector === "studio" && <LearningStudioPanel />}
-            {activeInspector === "state" && <StateInspector state={selectedState} instructions={parsed.instructions} stepLabel={selectedStep?.event ?? "No active step"} />}
+            {activeInspector === "state" && <StateInspector state={selectedState} instructions={simulation?.steps.length ? simulation.steps.map(s => s.instruction) : parsed.instructions} stepLabel={selectedStep?.event ?? "No active step"} />}
             {activeInspector === "bloch" && <BlochInspector state={selectedState} />}
             {activeInspector === "analysis" && (
               <WorkspaceAnalysisPanel

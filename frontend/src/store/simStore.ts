@@ -348,6 +348,11 @@ export const useSimStore = create<SimState>((set, get) => ({
       activeTemplateBaseCode: baseCode ?? template.code,
       templateParams: params,
       activeTemplateCategory: category,
+      result: null,
+      snapshots: [],
+      simulationResponse: null,
+      streamStep: 0,
+      error: null,
     })
   },
 
@@ -357,6 +362,11 @@ export const useSimStore = create<SimState>((set, get) => ({
     templateParams: {},
     activeTemplateCategory: category,
     engine,
+    result: null,
+    snapshots: [],
+    simulationResponse: null,
+    streamStep: 0,
+    error: null,
   }),
 
   reset: () => set({ result: null, snapshots: [], loading: false, error: null, streamStep: 0 }),

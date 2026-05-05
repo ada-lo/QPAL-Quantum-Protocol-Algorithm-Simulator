@@ -27,6 +27,28 @@ Z_MAP = {"0": "0", "1": "1", "+": "-", "-": "+", "mixed": "mixed", "uninitialize
 
 _S2 = 1.0 / math.sqrt(2.0)
 _MAX_SV_QUBITS = 12  # statevector sim capped at 12 qubits for performance
+_DEFAULT_SHOTS = 1024
+
+
+def _sample_counts(sv: list[complex], n_qubits: int, shots: int, rng: random.Random) -> dict[str, int]:
+    """Sample *shots* measurement outcomes from a statevector probability distribution."""
+    dim = 1 << n_qubits
+    probs = [abs(sv[i]) ** 2 for i in range(min(dim, len(sv)))]
+    total = sum(probs)
+    if total < 1e-15:
+        return {}
+    probs = [p / total for p in probs]
+    counts: dict[str, int] = {}
+    for _ in range(shots):
+        r = rng.random()
+        cumulative = 0.0
+        for i, p in enumerate(probs):
+            cumulative += p
+            if r < cumulative:
+                bitstring = format(i, f"0{n_qubits}b")
+                counts[bitstring] = counts.get(bitstring, 0) + 1
+                break
+    return counts
 
 
 # ── Lightweight statevector mini-simulator ────────────────────────────────────
@@ -622,6 +644,8 @@ def _simulate_workspace_impl(engine: CustomEngine, req: WorkspaceSimulateRequest
     for qubit_id in sorted(qubits):
         _sv_index(qubit_id)
 
+    pre_measurement_sv: list[complex] | None = None
+
     for index, instruction in enumerate(req.instructions):
         opcode = instruction.opcode.upper()
         event = f"Processed {opcode.lower()}."
@@ -796,6 +820,9 @@ def _simulate_workspace_impl(engine: CustomEngine, req: WorkspaceSimulateRequest
                 event = f"TOFFOLI left {target['id']} unchanged because both controls were not |1>."
             mini_sv.apply_toffoli(_sv_index(control_a["id"]), _sv_index(control_b["id"]), _sv_index(target["id"]))
         elif opcode == "MEASURE":
+            # Save the statevector before first measurement for shot sampling
+            if pre_measurement_sv is None and mini_sv.active:
+                pre_measurement_sv = list(mini_sv.sv)
             # Use the mini-sv measurement outcome for consistency
             qubit_id = instruction.qubits[0]
             qi = _sv_index(qubit_id)
@@ -862,6 +889,14 @@ def _simulate_workspace_impl(engine: CustomEngine, req: WorkspaceSimulateRequest
 
     final_state = steps[-1].state if steps else _snapshot(qubits, actors, measurements, transmissions, qubit_index_map, mini_sv)
 
+    # ── Shot sampling ──────────────────────────────────────────────────
+    _shots = 0
+    _counts: dict[str, int] = {}
+    if mini_sv.active and mini_sv.n > 0:
+        sample_sv = pre_measurement_sv if pre_measurement_sv is not None else mini_sv.sv
+        _shots = _DEFAULT_SHOTS
+        _counts = _sample_counts(list(sample_sv), mini_sv.n, _shots, rng)
+
     summary = WorkspaceSummary(
         qubits=sorted(qubits),
         actors=sorted(actors),
@@ -878,5 +913,7 @@ def _simulate_workspace_impl(engine: CustomEngine, req: WorkspaceSimulateRequest
         measurements=list(final_state.measurements),
         statevector=list(final_state.statevector),
         bloch_vectors=list(final_state.bloch_vectors),
+        shots=_shots,
+        counts=_counts,
         warnings=warnings,
     )

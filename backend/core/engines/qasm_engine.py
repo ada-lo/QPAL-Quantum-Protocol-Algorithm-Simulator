@@ -12,6 +12,7 @@ import traceback
 from typing import Any
 
 from api.schemas.workspace import (
+    MeasurementRecord,
     WorkspaceBlochVector,
     WorkspaceExecutionState,
     WorkspaceExecutionStep,
@@ -53,11 +54,18 @@ def _bloch_from_sv(sv_data, n_qubits: int, qubit_idx: int) -> tuple[float, float
     return x, y, z, purity
 
 
-def _sv_to_state(sv_data, n_qubits: int) -> WorkspaceExecutionState:
+def _sv_to_state(
+    sv_data,
+    n_qubits: int,
+    *,
+    last_ops: dict[str, str] | None = None,
+    measurements: list[MeasurementRecord] | None = None,
+) -> WorkspaceExecutionState:
     qubit_ids = [f"q{i}" for i in range(n_qubits)]
     bloch_vectors = []
     qubit_states = []
     statevector_flat: list[float] = []
+    _last_ops = last_ops or {}
     for idx, qid in enumerate(qubit_ids):
         x, y, z, purity = _bloch_from_sv(sv_data, n_qubits, idx)
         bloch_vectors.append(WorkspaceBlochVector(qubit=qid, x=x, y=y, z=z, purity=purity))
@@ -74,6 +82,7 @@ def _sv_to_state(sv_data, n_qubits: int) -> WorkspaceExecutionState:
                 initialized=True,
                 state_label=label,
                 superposition=(label not in {"0", "1"}),
+                last_operation=_last_ops.get(qid),
             )
         )
     for amp in sv_data:
@@ -83,7 +92,7 @@ def _sv_to_state(sv_data, n_qubits: int) -> WorkspaceExecutionState:
         qubits=qubit_states,
         actors=[],
         bloch_vectors=bloch_vectors,
-        measurements=[],
+        measurements=list(measurements) if measurements else [],
         transmissions=[],
         statevector=statevector_flat,
     )
@@ -225,6 +234,9 @@ def _execute_qasm_impl(engine: QASMEngine, req: WorkspaceSimulateRequest):
         n_qubits = circuit.num_qubits
         gate_data = [instr for instr in circuit.data if instr.operation.name not in ("barrier", "measure")]
 
+        # ── Track last operation per qubit ──────────────────────────────
+        last_ops: dict[str, str] = {}
+
         steps: list[WorkspaceExecutionStep] = []
         running = QuantumCircuit(n_qubits)
         for step_i, instr in enumerate(gate_data):
@@ -234,6 +246,9 @@ def _execute_qasm_impl(engine: QASMEngine, req: WorkspaceSimulateRequest):
             gate_name = instr.operation.name.upper()
             q_labels = [f"q{circuit.find_bit(q).index}" for q in instr.qubits]
             label = f"{gate_name} {', '.join(q_labels)}"
+
+            for ql in q_labels:
+                last_ops[ql] = gate_name
 
             steps.append(
                 WorkspaceExecutionStep(
@@ -248,10 +263,11 @@ def _execute_qasm_impl(engine: QASMEngine, req: WorkspaceSimulateRequest):
                         category="quantum",
                     ),
                     event=f"Applied {label}.",
-                    state=_sv_to_state(list(sv.data), n_qubits),
+                    state=_sv_to_state(list(sv.data), n_qubits, last_ops=dict(last_ops)),
                 )
             )
 
+        # ── Shot-based simulation ──────────────────────────────────────
         compute_target = req.compute or ("gpu" if req.prefer_gpu else None)
         sim = _build_simulator(compute_target, req.noise_model, warnings=warnings)
         meas_circuit = circuit.copy()
@@ -259,11 +275,68 @@ def _execute_qasm_impl(engine: QASMEngine, req: WorkspaceSimulateRequest):
             meas_circuit.measure_all()
         counts = sim.run(transpile(meas_circuit, sim), shots=1024).result().get_counts()
 
+        # ── Build MeasurementRecord entries from measured qubits ───────
+        measurement_records: list[MeasurementRecord] = []
+        measured_qubits: list[str] = []
+        for instr in circuit.data:
+            if instr.operation.name == "measure":
+                for q in instr.qubits:
+                    qid = f"q{circuit.find_bit(q).index}"
+                    if qid not in measured_qubits:
+                        measured_qubits.append(qid)
+
+        if measured_qubits and counts:
+            # Determine per-qubit outcomes from the most frequent bitstring.
+            # Qiskit bitstrings: rightmost char = lowest classical bit.
+            most_common = max(counts, key=counts.get)
+            reversed_bits = most_common[::-1]  # index 0 = c[0]
+
+            for meas_idx, qid in enumerate(measured_qubits):
+                bit_val = int(reversed_bits[meas_idx]) if meas_idx < len(reversed_bits) else 0
+                measurement_records.append(
+                    MeasurementRecord(
+                        qubit=qid,
+                        basis="Z",
+                        value=bit_val,
+                        step=len(steps),
+                    )
+                )
+                last_ops[qid] = "MEASURE[Z]"
+
+        # ── Final statevector (gate-only) ──────────────────────────────
         gate_only = QuantumCircuit(n_qubits)
         for instr in gate_data:
             gate_only.append(instr.operation, instr.qubits)
         final_sv = Statevector.from_instruction(gate_only)
-        final_state = _sv_to_state(list(final_sv.data), n_qubits)
+
+        # ── Add a measurement step if measurements exist ───────────────
+        if measurement_records:
+            steps.append(
+                WorkspaceExecutionStep(
+                    index=len(steps),
+                    instruction=WorkspaceInstruction(
+                        line=len(steps) + 1,
+                        raw=f"MEASURE {', '.join(measured_qubits)}",
+                        opcode="MEASURE",
+                        args=measured_qubits,
+                        qubits=measured_qubits,
+                        actors=[],
+                        category="quantum",
+                    ),
+                    event=f"Measured {', '.join(measured_qubits)} in Z basis.",
+                    state=_sv_to_state(
+                        list(final_sv.data), n_qubits,
+                        last_ops=dict(last_ops),
+                        measurements=measurement_records,
+                    ),
+                )
+            )
+
+        final_state = _sv_to_state(
+            list(final_sv.data), n_qubits,
+            last_ops=dict(last_ops),
+            measurements=measurement_records,
+        )
 
         return engine.format_response(
             engine="openqasm",
@@ -271,9 +344,10 @@ def _execute_qasm_impl(engine: QASMEngine, req: WorkspaceSimulateRequest):
                 qubits=[f"q{i}" for i in range(n_qubits)],
                 actors=[],
                 total_steps=len(steps),
-                measurements=sum(counts.values()),
+                measurements=len(measurement_records),
             ),
             steps=steps,
+            measurements=measurement_records,
             statevector=final_state.statevector,
             bloch_vectors=list(final_state.bloch_vectors),
             shots=sum(counts.values()),
