@@ -177,6 +177,15 @@ class WorkspaceCatalogResponse(BaseModel):
     architecture_notes: list[str] = Field(default_factory=list)
 
 
+class ArxivPaper(BaseModel):
+    id: str
+    title: str
+    authors: list[str] = Field(default_factory=list)
+    published: str = ""
+    summary: str = ""
+    link: str = ""
+
+
 class WorkspaceBenchmarkRequest(BaseModel):
     benchmark_ids: list[str] | None = None
     repetitions: int = Field(default=1, ge=1, le=5)
